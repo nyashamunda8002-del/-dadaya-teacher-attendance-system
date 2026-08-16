@@ -1,0 +1,6 @@
+{
+  "name": "Dadaya High School Attendance System",
+  "description": "Comprehensive school attendance tracking application with Teacher and Admin flows, early clocking notifications, location-based check-in, reports, and auto-login.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

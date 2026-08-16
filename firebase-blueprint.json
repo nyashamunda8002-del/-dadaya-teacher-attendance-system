@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dadaya High School Attendance Database Blueprint",
+  "entities": {
+    "teachers": {
+      "title": "Teacher / Staff Profile",
+      "description": "Registered teachers and school staff members",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nationalId": { "type": "string" },
+        "ecNumber": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["teacher", "admin", "hod", "deputy_head", "headmaster"] },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } },
+        "classAssigned": { "type": "string" },
+        "department": { "type": "string" },
+        "avatar": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nationalId", "fullName", "role"]
+    },
+    "attendance_records": {
+      "title": "Attendance Record",
+      "description": "Daily teacher clock-in and clock-out logs with GPS coordinates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "nationalId": { "type": "string" },
+        "ecNumber": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "date": { "type": "string" },
+        "clockInTime": { "type": "string" },
+        "clockInStatus": { "type": "string", "enum": ["on_time", "late", "excused", "early"] },
+        "clockInLatitude": { "type": "number" },
+        "clockInLongitude": { "type": "number" },
+        "clockInDevice": { "type": "string" },
+        "clockInVerified": { "type": "boolean" },
+        "clockOutTime": { "type": "string" },
+        "clockOutStatus": { "type": "string", "enum": ["on_time", "early", "overtime"] },
+        "clockOutLatitude": { "type": "number" },
+        "clockOutLongitude": { "type": "number" },
+        "clockOutDevice": { "type": "string" },
+        "clockOutVerified": { "type": "boolean" },
+        "workingDurationHours": { "type": "number" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "teacherId", "date"]
+    },
+    "early_clock_notifications": {
+      "title": "Early Clock Notification",
+      "description": "Alerts generated when staff clock in or out unusually early",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "type": { "type": "string", "enum": ["early_in", "early_out"] },
+        "scheduledTime": { "type": "string" },
+        "actualTime": { "type": "string" },
+        "diffMinutes": { "type": "number" },
+        "reason": { "type": "string" },
+        "approved": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "teacherId", "teacherName", "type", "actualTime"]
+    },
+    "school_settings": {
+      "title": "School Configuration",
+      "description": "Dadaya High School bell schedules, GPS coordinates, and thresholds",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "schoolMotto": { "type": "string" },
+        "termName": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "standardClockInTime": { "type": "string" },
+        "standardClockOutTime": { "type": "string" },
+        "lateGracePeriodMinutes": { "type": "number" },
+        "earlyClockInThreshold": { "type": "string" },
+        "earlyClockOutThreshold": { "type": "string" },
+        "schoolLatitude": { "type": "number" },
+        "schoolLongitude": { "type": "number" },
+        "allowedRadiusMeters": { "type": "number" },
+        "requireLocation": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "schoolName", "schoolLatitude", "schoolLongitude"]
+    }
+  },
+  "firestore": {
+    "teachers": {
+      "collection": "teachers",
+      "description": "Collection of teachers and admins"
+    },
+    "attendance_records": {
+      "collection": "attendance_records",
+      "description": "Collection of daily attendance check-ins"
+    },
+    "early_clock_notifications": {
+      "collection": "early_clock_notifications",
+      "description": "Collection of early departure notifications"
+    },
+    "school_settings": {
+      "collection": "school_settings",
+      "description": "School global settings document"
+    }
+  }
+}
