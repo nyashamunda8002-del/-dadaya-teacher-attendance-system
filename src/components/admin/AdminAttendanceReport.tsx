@@ -11,11 +11,13 @@ import {
   Clock,
   AlertCircle,
   FileText,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { SchoolCrest } from '../common/SchoolCrest';
 
 export const AdminAttendanceReport: React.FC = () => {
-  const { users, attendanceRecords, schoolSettings } = useApp();
+  const { users, attendanceRecords, schoolSettings, clearAttendanceRecords, deleteAttendanceRecord } = useApp();
 
   const [reportType, setReportType] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>('Daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -69,15 +71,32 @@ export const AdminAttendanceReport: React.FC = () => {
       {/* Filters Bar matching wireframe screen #6 */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Attendance Report</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Comprehensive attendance logs for {schoolSettings.schoolName}
-            </p>
+          <div className="flex items-center gap-3">
+            <SchoolCrest size="sm" />
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Attendance Report</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Comprehensive attendance logs for {schoolSettings.schoolName}
+              </p>
+            </div>
           </div>
 
           {/* Export Buttons matching wireframe */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {attendanceRecords.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to delete all clocked in attendance records? This action cannot be undone.')) {
+                    clearAttendanceRecords();
+                  }
+                }}
+                className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"
+                title="Remove all attendance records"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+                <span>Clear Records</span>
+              </button>
+            )}
             <button
               onClick={handlePrint}
               className="px-4 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition"

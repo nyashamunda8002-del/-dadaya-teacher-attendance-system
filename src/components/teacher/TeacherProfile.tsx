@@ -15,9 +15,13 @@ import {
   X,
   Sparkles,
   Phone,
+  Smartphone,
+  Download,
+  ArrowDownToLine,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from '../common/SchoolCrest';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const TeacherProfile: React.FC = () => {
   const { currentUser, updateUserProfile, logout, schoolSettings } = useApp();
@@ -193,6 +197,30 @@ export const TeacherProfile: React.FC = () => {
             support@dadayahigh.ac.zw
           </span>
         </div>
+
+        {/* Download Android App */}
+        <a
+          href="/api/download-app"
+          download="DadayaAttendance-v1.0.4.apk"
+          onClick={() => triggerHaptic('medium')}
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-emerald-50 rounded-2xl transition group border border-emerald-100 bg-emerald-50/50"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+              <ArrowDownToLine className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-gray-900">Download Android App</h4>
+                <span className="bg-emerald-600 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded uppercase">
+                  APK
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800">Download installer package to your phone storage</p>
+            </div>
+          </div>
+          <Download className="w-5 h-5 text-emerald-600 group-hover:translate-y-0.5 transition-transform" />
+        </a>
 
         {/* About App */}
         <button

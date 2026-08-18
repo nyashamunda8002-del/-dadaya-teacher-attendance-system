@@ -105,7 +105,8 @@ export interface SchoolSettings {
   earlyClockOutThreshold: string; // "15:00"
   schoolLatitude: number; // Dadaya High School approx -20.3167
   schoolLongitude: number; // 29.9833
-  allowedRadiusMeters: number; // 500 meters
+  allowedRadiusMeters: number; // 100 meters
   requireLocation: boolean;
+  lockMessage?: string;
   soundEffectsEnabled?: boolean;
 }

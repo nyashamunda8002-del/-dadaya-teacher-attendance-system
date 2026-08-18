@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   School,
@@ -22,6 +22,11 @@ import {
   Play,
   CalendarDays,
   Sparkles,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  FileJson,
+  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { soundEffects } from '../../utils/soundEffects';
@@ -37,9 +42,15 @@ export const AdminSettings: React.FC = () => {
     attendanceRecords,
     isFirebaseLinked,
     leaveRequests,
+    exportCompleteBackup,
+    exportAttendanceCSV,
+    restoreBackupData,
   } = useApp();
 
   const [activeModal, setActiveModal] = useState<'school' | 'rules' | 'backup' | 'confirmReset' | null>(null);
+  const [backupRestoreStatus, setBackupRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sound settings
   const [soundEnabled, setSoundEnabled] = useState(schoolSettings.soundEffectsEnabled ?? true);
@@ -50,6 +61,23 @@ export const AdminSettings: React.FC = () => {
   const [allowedRadius, setAllowedRadius] = useState(schoolSettings.allowedRadiusMeters);
   const [latitude, setLatitude] = useState(schoolSettings.schoolLatitude);
   const [longitude, setLongitude] = useState(schoolSettings.schoolLongitude);
+  const [lockMessage, setLockMessage] = useState(
+    schoolSettings.lockMessage ||
+      'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.'
+  );
+
+  React.useEffect(() => {
+    setSchoolName(schoolSettings.schoolName);
+    setAcademicYear(schoolSettings.academicYear);
+    setAllowedRadius(schoolSettings.allowedRadiusMeters);
+    setLatitude(schoolSettings.schoolLatitude);
+    setLongitude(schoolSettings.schoolLongitude);
+    setLockMessage(
+      schoolSettings.lockMessage ||
+        'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.'
+    );
+    setSoundEnabled(schoolSettings.soundEffectsEnabled ?? true);
+  }, [schoolSettings]);
 
   // Attendance rules form
   const [clockInTime, setClockInTime] = useState(schoolSettings.standardClockInTime);
@@ -68,12 +96,13 @@ export const AdminSettings: React.FC = () => {
       allowedRadiusMeters: Number(allowedRadius),
       schoolLatitude: Number(latitude),
       schoolLongitude: Number(longitude),
+      lockMessage: lockMessage.trim(),
     });
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
       setActiveModal(null);
-    }, 1000);
+    }, 1500);
   };
 
   const handleSaveRules = (e: React.FormEvent) => {
@@ -92,20 +121,41 @@ export const AdminSettings: React.FC = () => {
     }, 1000);
   };
 
-  const handleDownloadBackup = () => {
-    const backupData = {
-      exportDate: new Date().toISOString(),
-      schoolSettings,
-      users,
-      attendanceRecords,
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsRestoring(true);
+    setBackupRestoreStatus(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        const result = await restoreBackupData(parsed);
+        if (result.success) {
+          setBackupRestoreStatus({ type: 'success', message: result.message });
+        } else {
+          setBackupRestoreStatus({ type: 'error', message: result.message });
+        }
+      } catch (err: any) {
+        setBackupRestoreStatus({
+          type: 'error',
+          message: 'Failed to read JSON backup file. Please ensure it is a valid backup.',
+        });
+      } finally {
+        setIsRestoring(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
     };
-    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(backupData, null, 2))}`;
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', jsonString);
-    downloadAnchor.setAttribute('download', `Dadaya_Attendance_Backup_${Date.now()}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    reader.onerror = () => {
+      setIsRestoring(false);
+      setBackupRestoreStatus({ type: 'error', message: 'File reading encountered an unexpected error.' });
+    };
+    reader.readAsText(file);
   };
 
   const pendingLeaves = leaveRequests.filter((l) => l.status === 'pending').length;
@@ -387,6 +437,18 @@ export const AdminSettings: React.FC = () => {
                   />
                 </div>
 
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">Lock Message (Shown to Teachers when Off-Campus)</label>
+                  <textarea
+                    rows={2}
+                    value={lockMessage}
+                    onChange={(e) => setLockMessage(e.target.value)}
+                    placeholder="Attendance clocking is locked: You are outside Dadaya High School campus..."
+                    className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">Displayed automatically when teachers try to clock in/out outside the 100m geofence.</p>
+                </div>
+
                 <div className="flex justify-end gap-2 pt-3">
                   <button
                     type="button"
@@ -520,26 +582,127 @@ export const AdminSettings: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden p-6"
+              className="w-full max-w-lg bg-white rounded-3xl shadow-xl overflow-hidden p-6 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-base">Backup & Data Management</h3>
-                <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">Backup & Record Preservation</h3>
+                    <p className="text-[11px] text-gray-500">Secure export, CSV reporting, and cloud synchronization</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveModal(null);
+                    setBackupRestoreStatus(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 p-1"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <p className="text-xs text-gray-600 mb-5 leading-relaxed">
-                Download a complete encrypted JSON backup of all registered faculty, attendance records, settings, and early notification logs.
-              </p>
+              {/* Data Persistence Guarantee Banner */}
+              <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl mb-4 flex items-start gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-900">
+                  <p className="font-bold">Permanent Attendance Protection</p>
+                  <p className="text-[11px] text-blue-700 mt-0.5 leading-relaxed">
+                    Attendance records of logged out teachers are permanently retained. Logging out never deletes history, and all logs are backed up to Cloud Firestore.
+                  </p>
+                </div>
+              </div>
 
-              <button
-                onClick={handleDownloadBackup}
-                className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 mb-3"
-              >
-                <Database className="w-4 h-4" />
-                <span>Export System JSON Backup</span>
-              </button>
+              {/* Current Database Statistics */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-center">
+                  <p className="text-[10px] uppercase font-bold text-slate-600">Total Records</p>
+                  <p className="text-base font-extrabold text-slate-900">{attendanceRecords.length}</p>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-center">
+                  <p className="text-[10px] uppercase font-bold text-slate-600">Faculty Staff</p>
+                  <p className="text-base font-extrabold text-slate-900">{users.length}</p>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-center">
+                  <p className="text-[10px] uppercase font-bold text-slate-600">Leave Logs</p>
+                  <p className="text-base font-extrabold text-slate-900">{leaveRequests.length}</p>
+                </div>
+              </div>
+
+              {/* Status Message */}
+              {backupRestoreStatus && (
+                <div
+                  className={`p-3 rounded-xl mb-4 text-xs font-semibold flex items-center gap-2 ${
+                    backupRestoreStatus.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {backupRestoreStatus.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                  )}
+                  <span>{backupRestoreStatus.message}</span>
+                </div>
+              )}
+
+              {/* Export Section */}
+              <div className="space-y-2 mb-5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 block">Export Options</label>
+                
+                <button
+                  onClick={exportCompleteBackup}
+                  className="w-full p-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileJson className="w-4 h-4 text-emerald-200" />
+                    <span>Download Full System Snapshot (JSON)</span>
+                  </div>
+                  <Download className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={exportAttendanceCSV}
+                  className="w-full p-3 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-slate-300" />
+                    <span>Export Attendance Ledger (Excel / CSV)</span>
+                  </div>
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Import / Restore Section */}
+              <div className="space-y-2 pt-3 border-t border-gray-100">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 block">
+                  Restore / Import Backup
+                </label>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept=".json,application/json"
+                  className="hidden"
+                />
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isRestoring}
+                  className="w-full p-3 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <Upload className="w-4 h-4 text-slate-500" />
+                  <span>{isRestoring ? 'Restoring records...' : 'Select JSON Backup File to Restore'}</span>
+                </button>
+                <p className="text-[10px] text-gray-400 text-center">
+                  Restoring will merge records and synchronize with Cloud Firestore.
+                </p>
+              </div>
             </motion.div>
           </div>
         )}

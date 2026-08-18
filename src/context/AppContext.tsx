@@ -72,10 +72,15 @@ interface AppContextType {
   submitEarlyNotice: (type: 'early_in' | 'early_out', reason: string) => void;
   acknowledgeNotification: (id: string) => void;
   clearAllNotifications: () => void;
+  clearAttendanceRecords: () => Promise<{ success: boolean; message: string }>;
+  deleteAttendanceRecord: (recordId: string) => Promise<void>;
   deleteTeacher: (teacherId: string) => void;
   addTeacherByAdmin: (teacherData: Partial<User>) => void;
   updateSchoolSettings: (settings: Partial<SchoolSettings>) => void;
   resetAllData: () => void;
+  exportCompleteBackup: () => void;
+  exportAttendanceCSV: () => void;
+  restoreBackupData: (backupPayload: any) => Promise<{ success: boolean; message: string }>;
   viewMode: 'desktop' | 'mobile-frame';
   setViewMode: (mode: 'desktop' | 'mobile-frame') => void;
   switchUserRole: (role: UserRole) => void;
@@ -91,8 +96,9 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   earlyClockOutThreshold: '15:15',
   schoolLatitude: -20.34049,
   schoolLongitude: 29.97782,
-  allowedRadiusMeters: 800,
+  allowedRadiusMeters: 100,
   requireLocation: true,
+  lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
 };
 
 export const DADAYA_ADMIN_CREDENTIALS = {
@@ -214,9 +220,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const radius = parsed.allowedRadiusMeters === 800 ? 100 : (parsed.allowedRadiusMeters ?? 100);
+        const msg = parsed.lockMessage
+          ? parsed.lockMessage.replace(/800\s*m?/gi, '100m')
+          : DEFAULT_SETTINGS.lockMessage;
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
+          allowedRadiusMeters: radius,
+          lockMessage: msg,
           schoolLatitude: parsed.schoolLatitude ?? -20.34049,
           schoolLongitude: parsed.schoolLongitude ?? 29.97782,
         };
@@ -334,9 +346,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (docSnap) => {
           if (docSnap.exists()) {
             const remoteSettings = docSnap.data() as Partial<SchoolSettings>;
+            const radius = remoteSettings.allowedRadiusMeters === 800 ? 100 : (remoteSettings.allowedRadiusMeters ?? 100);
+            const msg = remoteSettings.lockMessage
+              ? remoteSettings.lockMessage.replace(/800\s*m?/gi, '100m')
+              : undefined;
             setSchoolSettings((prev) => ({
               ...prev,
               ...remoteSettings,
+              allowedRadiusMeters: radius,
+              ...(msg ? { lockMessage: msg } : {}),
               schoolLatitude: remoteSettings.schoolLatitude ?? -20.34049,
               schoolLongitude: remoteSettings.schoolLongitude ?? 29.97782,
             }));
@@ -463,6 +481,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (setRes && setRes.ok) {
           const remoteSet = await setRes.json();
           if (remoteSet && remoteSet.schoolName) {
+            const radius = remoteSet.allowedRadiusMeters === 800 ? 100 : (remoteSet.allowedRadiusMeters || 100);
+            const msg = remoteSet.lockMessage
+              ? remoteSet.lockMessage.replace(/800\s*m?/gi, '100m')
+              : undefined;
             setSchoolSettings((prev) => ({
               ...prev,
               schoolName: remoteSet.schoolName,
@@ -471,7 +493,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               standardClockOutTime: remoteSet.standardClockOutTime,
               schoolLatitude: remoteSet.schoolLatitude ?? -20.34049,
               schoolLongitude: remoteSet.schoolLongitude ?? 29.97782,
-              allowedRadiusMeters: remoteSet.allowedRadiusMeters || 800,
+              allowedRadiusMeters: radius,
+              ...(msg ? { lockMessage: msg } : {}),
             }));
           }
         }
@@ -1498,6 +1521,231 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.clear();
   };
 
+  // Complete JSON Backup Exporter
+  const exportCompleteBackup = () => {
+    const backupData = {
+      exportTimestamp: new Date().toISOString(),
+      schoolName: schoolSettings.schoolName,
+      academicYear: schoolSettings.academicYear,
+      recordsCount: attendanceRecords.length,
+      usersCount: users.length,
+      leaveCount: leaveRequests.length,
+      data: {
+        users,
+        attendanceRecords,
+        leaveRequests,
+        notifications,
+        schoolSettings,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dadaya_attendance_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // CSV Attendance Exporter
+  const exportAttendanceCSV = () => {
+    const headers = [
+      'Record ID',
+      'Date',
+      'Teacher Name',
+      'Employee ID',
+      'Subject',
+      'Clock In Time',
+      'Clock Out Time',
+      'Status',
+      'Total Working Minutes',
+      'Early In Reason',
+      'Early Out Reason',
+      'Location Verified',
+      'Coordinates',
+    ];
+
+    const rows = attendanceRecords.map((r) => {
+      const u = users.find((usr) => usr.id === r.userId);
+      const coord = r.latitude && r.longitude ? `"${r.latitude}, ${r.longitude}"` : 'N/A';
+      return [
+        `"${r.id}"`,
+        `"${r.date}"`,
+        `"${r.teacherName} ${r.teacherSurname}"`,
+        `"${u?.employeeId || 'N/A'}"`,
+        `"${r.subject || u?.subject || 'General'}"`,
+        `"${r.clockInTime || 'N/A'}"`,
+        `"${r.clockOutTime || 'N/A'}"`,
+        `"${r.status}"`,
+        r.totalWorkingMinutes || 0,
+        `"${(r.earlyClockInReason || '').replace(/"/g, '""')}"`,
+        `"${(r.earlyClockOutReason || '').replace(/"/g, '""')}"`,
+        r.locationVerified ? 'Yes' : 'No',
+        coord,
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dadaya_attendance_records_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Restore Backup Function
+  const restoreBackupData = async (backupPayload: any): Promise<{ success: boolean; message: string }> => {
+    try {
+      const payloadData = backupPayload?.data || backupPayload;
+      if (!payloadData || (!payloadData.attendanceRecords && !payloadData.users)) {
+        return { success: false, message: 'Invalid backup format: missing attendance records or faculty data.' };
+      }
+
+      const newRecords: AttendanceRecord[] = payloadData.attendanceRecords || [];
+      const newUsers: User[] = payloadData.users || [];
+      const newLeaves: LeaveRequest[] = payloadData.leaveRequests || [];
+      const newSettings: Partial<SchoolSettings> = payloadData.schoolSettings || {};
+
+      if (newRecords.length > 0) {
+        setAttendanceRecords((prev) => {
+          const map = new Map(prev.map((r) => [r.id, r]));
+          newRecords.forEach((r) => map.set(r.id, r));
+          const merged = Array.from(map.values());
+          localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(merged));
+          return merged;
+        });
+
+        newRecords.forEach((r) => {
+          setDoc(doc(db, 'attendance', r.id), r).catch(() => null);
+        });
+      }
+
+      if (newUsers.length > 0) {
+        setUsers((prev) => {
+          const map = new Map(prev.map((u) => [u.id, u]));
+          newUsers.forEach((u) => map.set(u.id, u));
+          const merged = Array.from(map.values());
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(merged));
+          return merged;
+        });
+
+        newUsers.forEach((u) => {
+          setDoc(doc(db, 'users', u.id), u).catch(() => null);
+        });
+      }
+
+      if (newLeaves.length > 0) {
+        setLeaveRequests((prev) => {
+          const map = new Map(prev.map((l) => [l.id, l]));
+          newLeaves.forEach((l) => map.set(l.id, l));
+          const merged = Array.from(map.values());
+          localStorage.setItem(STORAGE_KEYS.LEAVE, JSON.stringify(merged));
+          return merged;
+        });
+
+        newLeaves.forEach((l) => {
+          setDoc(doc(db, 'leave_requests', l.id), l).catch(() => null);
+        });
+      }
+
+      if (Object.keys(newSettings).length > 0) {
+        updateSchoolSettings(newSettings);
+      }
+
+      return {
+        success: true,
+        message: `Successfully restored ${newRecords.length} attendance records and ${newUsers.length} faculty profiles!`,
+      };
+    } catch (err: any) {
+      return { success: false, message: `Backup restoration failed: ${err?.message || 'Unknown error'}` };
+    }
+  };
+
+  const clearAttendanceRecords = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      setAttendanceRecords([]);
+      localStorage.removeItem(STORAGE_KEYS.RECORDS);
+
+      try {
+        const snapshot = await getDocs(collection(db, 'attendance'));
+        const deletePromises = snapshot.docs.map((docSnap) => deleteDoc(doc(db, 'attendance', docSnap.id)));
+        await Promise.all(deletePromises);
+      } catch (err) {
+        console.warn('Firestore attendance deletion error:', err);
+      }
+
+      try {
+        await fetch('/api/attendance', { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Backend attendance deletion error:', err);
+      }
+
+      return { success: true, message: 'All clocked in and attendance records have been successfully cleared.' };
+    } catch (err: any) {
+      console.error('Error clearing attendance records:', err);
+      return { success: false, message: err?.message || 'Failed to clear records' };
+    }
+  };
+
+  const deleteAttendanceRecord = async (recordId: string): Promise<void> => {
+    try {
+      setAttendanceRecords((prev) => {
+        const updated = prev.filter((r) => r.id !== recordId);
+        localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(updated));
+        return updated;
+      });
+
+      deleteDoc(doc(db, 'attendance', recordId)).catch((e) => console.warn('Firestore delete record error:', e));
+      fetch(`/api/attendance/${recordId}`, { method: 'DELETE' }).catch((e) => console.warn('Backend delete record error:', e));
+    } catch (err) {
+      console.error('Error deleting record:', err);
+    }
+  };
+
+  // Immediate purge of clocked in data as requested
+  useEffect(() => {
+    setAttendanceRecords([]);
+    localStorage.removeItem(STORAGE_KEYS.RECORDS);
+
+    getDocs(collection(db, 'attendance'))
+      .then((snapshot) => {
+        snapshot.docs.forEach((docSnap) => {
+          deleteDoc(doc(db, 'attendance', docSnap.id)).catch(() => null);
+        });
+      })
+      .catch((err) => console.warn('Purge firestore attendance records error:', err));
+
+    fetch('/api/attendance', { method: 'DELETE' }).catch(() => null);
+
+    setNotifications((prev) => {
+      const cleaned = prev.filter(
+        (n) =>
+          !n.reason?.toLowerCase().includes('simulated') &&
+          !n.reason?.toLowerCase().includes('standard dismissal:')
+      );
+      if (cleaned.length !== prev.length) {
+        localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(cleaned));
+        prev
+          .filter(
+            (n) =>
+              n.reason?.toLowerCase().includes('simulated') ||
+              n.reason?.toLowerCase().includes('standard dismissal:')
+          )
+          .forEach((n) => deleteDoc(doc(db, 'notifications', n.id)).catch(() => null));
+      }
+      return cleaned;
+    });
+  }, []);
+
   const switchUserRole = (role: UserRole) => {
     if (!currentUser) return;
     // Strictly prevent teachers from switching to admin without logging into the Admin Portal
@@ -1542,10 +1790,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submitEarlyNotice,
         acknowledgeNotification,
         clearAllNotifications,
+        clearAttendanceRecords,
+        deleteAttendanceRecord,
         deleteTeacher,
         addTeacherByAdmin,
         updateSchoolSettings,
         resetAllData,
+        exportCompleteBackup,
+        exportAttendanceCSV,
+        restoreBackupData,
         viewMode,
         setViewMode,
         switchUserRole,

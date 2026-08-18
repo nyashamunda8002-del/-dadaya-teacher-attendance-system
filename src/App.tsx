@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AppProvider, useApp } from './context/AppContext';
 import { SplashScreen } from './components/auth/SplashScreen';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { Header } from './components/common/Header';
 import { Navigation } from './components/common/Navigation';
+import { AndroidInstallBanner } from './components/common/AndroidInstallBanner';
+import { TeacherAiAssistant } from './components/common/TeacherAiAssistant';
+import { triggerHaptic } from './utils/haptics';
 
 // Teacher Views
 import { TeacherDashboard } from './components/teacher/TeacherDashboard';
@@ -23,7 +26,27 @@ import { AdminReportsMenu } from './components/admin/AdminReportsMenu';
 import { AdminSettings } from './components/admin/AdminSettings';
 
 const MainAppContent: React.FC = () => {
-  const { currentUser, isLoading, activeView } = useApp();
+  const { currentUser, isLoading, activeView, setActiveView } = useApp();
+
+  // Android Back Button listener: Navigates to home screen instead of closing app
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (currentUser) {
+        const homeView = currentUser.role === 'teacher' ? 'home' : 'dashboard';
+        if (activeView !== homeView) {
+          triggerHaptic('light');
+          setActiveView(homeView);
+        }
+      }
+    };
+
+    window.history.pushState({ view: activeView }, '');
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [activeView, currentUser, setActiveView]);
 
   // 1. Splash Screen during initial boot & auto-login check
   if (isLoading) {
@@ -32,7 +55,12 @@ const MainAppContent: React.FC = () => {
 
   // 2. Unauthenticated -> Auth Screen (Sign up / Login)
   if (!currentUser) {
-    return <AuthScreen />;
+    return (
+      <>
+        <AndroidInstallBanner />
+        <AuthScreen />
+      </>
+    );
   }
 
   // Render view router based on user role and activeView
@@ -77,6 +105,7 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col text-slate-900 selection:bg-emerald-200">
+      <AndroidInstallBanner />
       <Header />
       <Navigation />
 
@@ -94,6 +123,9 @@ const MainAppContent: React.FC = () => {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Floating AI Navigation Assistant for Teachers & Staff */}
+      <TeacherAiAssistant />
 
       {/* Global Desktop Footer */}
       <footer className="hidden md:block bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">

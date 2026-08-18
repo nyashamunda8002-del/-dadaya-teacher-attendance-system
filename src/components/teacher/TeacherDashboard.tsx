@@ -44,16 +44,12 @@ export const TeacherDashboard: React.FC = () => {
   const [badgeInput, setBadgeInput] = useState('');
   const [badgeScanning, setBadgeScanning] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  
   // Location and Geofencing state
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({
     lat: schoolSettings.schoolLatitude,
     lng: schoolSettings.schoolLongitude,
   });
   const [distanceMeters, setDistanceMeters] = useState<number>(0);
-  const [locationMode, setLocationMode] = useState<'on_campus' | 'off_campus' | 'live_gps'>('on_campus');
-  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Real-time digital clock ticker
   useEffect(() => {
@@ -74,7 +70,6 @@ export const TeacherDashboard: React.FC = () => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           setCurrentCoords({ lat, lng });
-          setLocationMode('live_gps');
         },
         () => {},
         { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
@@ -85,7 +80,6 @@ export const TeacherDashboard: React.FC = () => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           setCurrentCoords({ lat, lng });
-          setLocationMode('live_gps');
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 10000 }
@@ -117,12 +111,6 @@ export const TeacherDashboard: React.FC = () => {
     return Math.round(R * c);
   };
 
-  const formatCoord = (lat: number, lng: number) => {
-    const latStr = `${Math.abs(lat).toFixed(5)}° ${lat < 0 ? 'S' : 'N'}`;
-    const lngStr = `${Math.abs(lng).toFixed(5)}° ${lng < 0 ? 'W' : 'E'}`;
-    return `${latStr}, ${lngStr}`;
-  };
-
   // Re-calculate distance whenever coordinates or school settings change
   useEffect(() => {
     const dist = computeDistance(
@@ -136,92 +124,6 @@ export const TeacherDashboard: React.FC = () => {
 
   const isWithinCampus = distanceMeters <= schoolSettings.allowedRadiusMeters;
 
-  // Real device GPS verification
-  const handleVerifyGPS = () => {
-    if (!navigator.geolocation) {
-      setFeedbackMsg({
-        text: 'GPS geolocation is not supported in this browser. Running in campus geofence mode.',
-        type: 'info',
-      });
-      return;
-    }
-
-    setIsLocating(true);
-    setLocationError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCurrentCoords({ lat, lng });
-        setLocationMode('live_gps');
-
-        const dist = computeDistance(
-          lat,
-          lng,
-          schoolSettings.schoolLatitude,
-          schoolSettings.schoolLongitude
-        );
-        setDistanceMeters(dist);
-
-        const schoolCoordStr = formatCoord(schoolSettings.schoolLatitude, schoolSettings.schoolLongitude);
-        if (dist <= schoolSettings.allowedRadiusMeters) {
-          setFeedbackMsg({
-            text: `GPS Verified! You are on Dadaya High School campus (${dist}m from perimeter, ${schoolCoordStr}).`,
-            type: 'success',
-          });
-        } else {
-          const distStr = dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist}m`;
-          setFeedbackMsg({
-            text: `Location Alert: Device GPS indicates you are ${distStr} away from Dadaya High School. Clocking is locked until you are within ${schoolSettings.allowedRadiusMeters}m of campus.`,
-            type: 'error',
-          });
-        }
-      },
-      (err) => {
-        setIsLocating(false);
-        setLocationError(
-          err.code === 1
-            ? 'Location permission denied. Please allow GPS access in your browser settings to verify you are on school grounds.'
-            : 'Could not acquire precise GPS fix. Ensure location services are turned on.'
-        );
-        setFeedbackMsg({
-          text: 'Device GPS unavailable. Please enable location permission or verify campus mode.',
-          type: 'info',
-        });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  };
-
-  // Location switchers (for simulation & verification in cloud/preview environments)
-  const setCampusLocation = () => {
-    setCurrentCoords({
-      lat: schoolSettings.schoolLatitude + 0.0001, // ~11 meters from school center
-      lng: schoolSettings.schoolLongitude + 0.0001,
-    });
-    setLocationMode('on_campus');
-    setLocationError(null);
-    setFeedbackMsg({
-      text: 'Verified at Dadaya High School Campus. Clocking is enabled.',
-      type: 'success',
-    });
-  };
-
-  const setOffCampusLocation = () => {
-    setCurrentCoords({
-      lat: schoolSettings.schoolLatitude + 0.05, // ~5.5 km away (e.g. Zvishavane town center)
-      lng: schoolSettings.schoolLongitude + 0.05,
-    });
-    setLocationMode('off_campus');
-    setLocationError(null);
-    setFeedbackMsg({
-      text: 'Simulated Off-Campus Location (~7.5 km away). Clocking is strictly blocked.',
-      type: 'error',
-    });
-  };
-
   const getGreeting = () => {
     const hour = currentTime.getHours();
     if (hour < 12) return 'Good Morning,';
@@ -233,8 +135,12 @@ export const TeacherDashboard: React.FC = () => {
     // Strictly verify location first
     if (!isWithinCampus) {
       const distStr = distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`;
+      const rawLock = schoolSettings.lockMessage || '';
+      const cleanedLock = rawLock.replace(/800\s*m?/gi, `${schoolSettings.allowedRadiusMeters}m`);
       setFeedbackMsg({
-        text: `Clock-In Blocked: You are currently ${distStr} away from Dadaya High School. Teachers must be physically located within ${schoolSettings.allowedRadiusMeters}m of the campus perimeter to clock in.`,
+        text: cleanedLock
+          ? `${cleanedLock} (Distance: ${distStr})`
+          : `Clock-In Blocked: You are currently ${distStr} away from Dadaya High School. You must be physically within ${schoolSettings.allowedRadiusMeters}m of campus to clock in.`,
         type: 'error',
       });
       return;
@@ -263,8 +169,12 @@ export const TeacherDashboard: React.FC = () => {
     // Strictly verify location first
     if (!isWithinCampus) {
       const distStr = distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`;
+      const rawLock = schoolSettings.lockMessage || '';
+      const cleanedLock = rawLock.replace(/800\s*m?/gi, `${schoolSettings.allowedRadiusMeters}m`);
       setFeedbackMsg({
-        text: `Clock-Out Blocked: You are currently ${distStr} away from Dadaya High School. Teachers must be physically located within ${schoolSettings.allowedRadiusMeters}m of the campus perimeter to clock out.`,
+        text: cleanedLock
+          ? `${cleanedLock} (Distance: ${distStr})`
+          : `Clock-Out Blocked: You are currently ${distStr} away from Dadaya High School. You must be physically within ${schoolSettings.allowedRadiusMeters}m of campus to clock out.`,
         type: 'error',
       });
       return;
@@ -447,55 +357,6 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Campus Geofence Status Pill & Verification Bar */}
-      <div className={`p-3 rounded-2xl border transition-all ${
-        isWithinCampus
-          ? 'bg-emerald-50/90 border-emerald-200'
-          : 'bg-rose-50 border-rose-200'
-      }`}>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-full ${
-              isWithinCampus ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-ping'
-            }`} />
-            <div className="text-xs">
-              <span className={`font-bold ${isWithinCampus ? 'text-emerald-950' : 'text-rose-950'}`}>
-                {isWithinCampus ? '✓ On Campus' : '⚠️ Off Campus (Locked)'}
-              </span>
-              <span className="text-[11px] text-gray-500 ml-1.5 hidden sm:inline">
-                • {schoolSettings.schoolName} ({distanceMeters}m)
-              </span>
-            </div>
-          </div>
-
-          {/* Location Actions: Verify GPS / Test Toggle */}
-          <div className="flex items-center gap-1.5 ml-auto">
-            <button
-              onClick={handleVerifyGPS}
-              disabled={isLocating}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-semibold rounded-lg flex items-center gap-1 transition shadow-2xs"
-              title="Acquire live device GPS"
-            >
-              <RefreshCw className={`w-3 h-3 ${isLocating ? 'animate-spin text-emerald-300' : ''}`} />
-              <span>{isLocating ? 'Locating...' : 'Verify GPS'}</span>
-            </button>
-
-            {/* Quick Simulation switcher for preview/testing */}
-            <button
-              onClick={isWithinCampus ? setOffCampusLocation : setCampusLocation}
-              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition ${
-                isWithinCampus
-                  ? 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                  : 'bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-800'
-              }`}
-              title="Toggle simulated location for testing"
-            >
-              {isWithinCampus ? 'Simulate Off-Campus' : 'Simulate On-Campus'}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Today's Times & Primary Clock Action Card */}
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
         {/* Status Header */}
@@ -562,13 +423,27 @@ export const TeacherDashboard: React.FC = () => {
         {/* Primary Thumb-Friendly Action Button */}
         <div>
           {!isWithinCampus && (
-            <div className="mb-3 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 text-xs text-rose-950">
-              <Lock className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold block">Clocking Buttons Automatically Locked</span>
-                <p className="text-[11px] text-rose-800 leading-snug mt-0.5">
-                  You are currently {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`} away from Dadaya High School. Attendance clocking is automatically locked until you arrive on school premises (within {schoolSettings.allowedRadiusMeters}m perimeter).
+            <div className="mb-3 p-3.5 bg-rose-50/90 border border-rose-200 rounded-2xl flex items-start gap-3 text-xs text-rose-950 shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-rose-100 border border-rose-300 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                <Lock className="w-4 h-4 text-rose-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-extrabold text-rose-900 text-xs">
+                    Attendance Clocking Locked
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-800">
+                    {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`} away
+                  </span>
+                </div>
+                <p className="text-[11px] text-rose-800 leading-snug mt-1">
+                  {(schoolSettings.lockMessage || '')
+                    .replace(/800\s*m?/gi, `${schoolSettings.allowedRadiusMeters}m`) ||
+                    `Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the ${schoolSettings.allowedRadiusMeters}m school boundary to clock in or clock out.`}
                 </p>
+                <div className="mt-1.5 flex items-center gap-2 text-[10px] text-rose-600 font-medium">
+                  <span>• Status: Outside school perimeter</span>
+                </div>
               </div>
             </div>
           )}
@@ -592,7 +467,7 @@ export const TeacherDashboard: React.FC = () => {
               ) : (
                 <>
                   <Lock className="w-4 h-4 text-rose-600" />
-                  <span>Clock In Locked (Off-Campus: {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
+                  <span>Clock In Locked (Off-Campus • {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
                 </>
               )}
             </button>
@@ -615,7 +490,7 @@ export const TeacherDashboard: React.FC = () => {
               ) : (
                 <>
                   <Lock className="w-4 h-4 text-rose-600" />
-                  <span>Clock Out Locked (Off-Campus: {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
+                  <span>Clock Out Locked (Off-Campus • {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
                 </>
               )}
             </button>

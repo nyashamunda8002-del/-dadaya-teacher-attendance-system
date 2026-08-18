@@ -1,24 +1,60 @@
 {
   "name": "Dadaya High School Attendance",
   "short_name": "Dadaya Attendance",
-  "description": "Dadaya High School Official Teacher & Admin Attendance System",
+  "description": "Dadaya High School Official Teacher & Admin Attendance System Android App",
+  "id": "org.dadayahighschool.attendance",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#064e3b",
   "theme_color": "#064e3b",
+  "categories": ["education", "productivity", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon.png",
-      "sizes": "512x512",
+      "sizes": "192x192 512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/dadaya-crest.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
     },
     {
       "src": "/icon.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Clock In / Check-In",
+      "short_name": "Clock In",
+      "description": "Quickly clock in or out for duty",
+      "url": "/?view=home",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Attendance History",
+      "short_name": "History",
+      "description": "View past attendance records",
+      "url": "/?view=history",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Leave Application",
+      "short_name": "Leave",
+      "description": "Submit a leave request",
+      "url": "/?view=leave",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const Navigation: React.FC = () => {
   const { currentUser, activeView, setActiveView, leaveRequests } = useApp();
@@ -52,7 +53,10 @@ export const Navigation: React.FC = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveView(tab.id)}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setActiveView(tab.id);
+                  }}
                   className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition duration-150 ${
                     isActive
                       ? isTeacher
@@ -90,7 +94,10 @@ export const Navigation: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveView(tab.id)}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActiveView(tab.id);
+                }}
                 className={`relative flex-1 flex flex-col items-center justify-center h-full py-1 transition-all select-none active:scale-95 ${
                   isActive
                     ? isTeacher

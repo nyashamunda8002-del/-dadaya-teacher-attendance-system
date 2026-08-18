@@ -62,7 +62,7 @@ export const AuthScreen: React.FC = () => {
   ];
 
   // Teacher Sign-Up Submit
-  const handleTeacherSignUp = (e: React.FormEvent) => {
+  const handleTeacherSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -84,7 +84,7 @@ export const AuthScreen: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const result = registerTeacher({
+      const result = await registerTeacher({
         name,
         surname,
         subject,

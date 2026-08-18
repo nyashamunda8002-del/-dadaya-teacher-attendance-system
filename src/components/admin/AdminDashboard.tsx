@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Users,
@@ -27,7 +27,7 @@ export const AdminDashboard: React.FC = () => {
     schoolSettings,
   } = useApp();
 
-  const [filterType, setFilterType] = React.useState<'all' | 'early' | 'late' | 'clock'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'early' | 'late' | 'clock'>('all');
 
   const todayStr = new Date().toISOString().split('T')[0];
   const registeredTeachers = users.filter((u) => u.role === 'teacher');
