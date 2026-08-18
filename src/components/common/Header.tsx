@@ -46,10 +46,7 @@ export const Header: React.FC = () => {
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-gray-900 tracking-tight text-sm sm:text-base uppercase group-hover:text-emerald-900 transition">
-                  Dadaya High
-                </span>
-                <span className="hidden sm:inline-block px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-extrabold rounded uppercase tracking-wider">
-                  School
+                  Dadaya High School
                 </span>
               </div>
               <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-800 tracking-wide uppercase line-clamp-1">

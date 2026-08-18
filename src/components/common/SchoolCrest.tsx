@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 interface SchoolCrestProps {
   className?: string;
@@ -11,209 +11,225 @@ export const SchoolCrest: React.FC<SchoolCrestProps> = ({
   size = 'md',
   showSubtitle = false,
 }) => {
-  const [imgError, setImgError] = useState(false);
-
   const sizeMap = {
-    xs: 'w-7 h-7 sm:w-8 sm:h-8',
-    sm: 'w-9 h-9 sm:w-10 sm:h-10',
-    md: 'w-14 h-14 sm:w-16 sm:h-16',
-    lg: 'w-20 h-20 sm:w-24 sm:h-24',
-    xl: 'w-28 h-28 sm:w-32 sm:h-32',
+    xs: 'w-8 h-9 sm:w-9 sm:h-10',
+    sm: 'w-11 h-12 sm:w-12 sm:h-14',
+    md: 'w-18 h-20 sm:w-22 sm:h-24',
+    lg: 'w-28 h-32 sm:w-32 sm:h-36',
+    xl: 'w-40 h-44 sm:w-44 sm:h-48',
   };
 
   return (
     <div className={`flex flex-col items-center select-none ${className}`}>
       <div className={`relative ${sizeMap[size]} flex items-center justify-center`}>
-        {!imgError ? (
-          <img
-            src="/dadaya-crest.jpg"
-            alt="Dadaya High School Official Crest"
-            referrerPolicy="no-referrer"
-            onError={() => setImgError(true)}
-            className="w-full h-full object-contain drop-shadow-sm rounded-lg"
+        {/* Authentic Dadaya High School Official Crest SVG with Complete Typography */}
+        <svg
+          viewBox="0 0 200 232"
+          className="w-full h-full drop-shadow-md overflow-visible"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            {/* Top Motto Arch */}
+            <path id="top-motto-path" d="M 48,46 Q 100,28 152,46" fill="none" />
+            {/* Lower Left HIGH Path */}
+            <path id="crest-high-path" d="M 32,196 Q 64,218 92,220" fill="none" />
+            {/* Lower Right SCHOOL Path with ample length so SCHOOL is never truncated */}
+            <path id="crest-school-path" d="M 108,220 Q 138,218 172,194" fill="none" />
+
+            <linearGradient id="shieldGreenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#15803D" />
+              <stop offset="50%" stopColor="#166534" />
+              <stop offset="100%" stopColor="#14532D" />
+            </linearGradient>
+
+            <linearGradient id="crestGoldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FBBF24" />
+              <stop offset="100%" stopColor="#F59E0B" />
+            </linearGradient>
+          </defs>
+
+          {/* 1. OUTER GREEN SHIELD */}
+          <path
+            d="M 30,26 C 65,12 85,30 100,30 C 115,30 135,12 170,26 C 174,75 168,128 100,185 C 32,128 26,75 30,26 Z"
+            fill="url(#shieldGreenGradient)"
+            stroke="#0F3D24"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
           />
-        ) : (
-          /* Authentic Dadaya High School Crest SVG Fallback */
-          <svg
-            viewBox="0 0 120 144"
-            className="w-full h-full drop-shadow-md overflow-visible"
-            xmlns="http://www.w3.org/2000/svg"
+
+          {/* 2. INNER WHITE SHIELD CONTOUR */}
+          <path
+            d="M 36,32 C 68,20 86,36 100,36 C 114,36 132,20 164,32 C 167,76 161,123 100,176 C 39,123 33,76 36,32 Z"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="3.5"
+            strokeLinejoin="round"
+          />
+
+          {/* 3. GOLD INNER MOTTO FRAME */}
+          <path
+            d="M 45,54 C 45,40 68,34 100,34 C 132,34 155,40 155,54 L 155,120 L 100,165 L 45,120 Z"
+            fill="url(#crestGoldGradient)"
+            stroke="#1E293B"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+
+          {/* 4. MOTTO INSCRIPTIONS */}
+          {/* Top: EDUCATION FOR LIFE */}
+          <text
+            fontSize="8.5"
+            fontWeight="900"
+            fontFamily="'Arial Black', Impact, sans-serif"
+            fill="#1E293B"
+            letterSpacing="0.6"
           >
-            {/* Definitions for gradients & paths */}
-            <defs>
-              <path id="high-path" d="M 16,128 Q 30,138 48,142" fill="none" />
-              <path id="school-path" d="M 72,142 Q 90,138 104,128" fill="none" />
-              <path id="motto-top" d="M 34,42 Q 60,30 86,42" fill="none" />
-            </defs>
+            <textPath href="#top-motto-path" startOffset="50%" textAnchor="middle">
+              EDUCATION FOR LIFE
+            </textPath>
+          </text>
 
-            {/* 1. Outer Green Shield Base with Crest Peaks */}
-            <path
-              d="M 14,14 C 36,4 48,16 60,16 C 72,16 84,4 106,14 C 108,50 106,86 60,132 C 14,86 12,50 14,14 Z"
-              fill="#15803D"
-              stroke="#166534"
-              strokeWidth="1.5"
-            />
+          {/* Left: IMFUNDO */}
+          <text
+            x="52"
+            y="92"
+            fontSize="8"
+            fontWeight="900"
+            fontFamily="'Arial Black', sans-serif"
+            fill="#1E293B"
+            transform="rotate(-90 52,92)"
+            textAnchor="middle"
+            letterSpacing="0.5"
+          >
+            IMFUNDO
+          </text>
 
-            {/* Inner White Border Trim */}
-            <path
-              d="M 18,18 C 38,9 49,19 60,19 C 71,19 82,9 102,18 C 103,49 101,82 60,126 C 19,82 17,49 18,18 Z"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
+          {/* Right: YOWUPENYU */}
+          <text
+            x="148"
+            y="92"
+            fontSize="7.5"
+            fontWeight="900"
+            fontFamily="'Arial Black', sans-serif"
+            fill="#1E293B"
+            transform="rotate(90 148,92)"
+            textAnchor="middle"
+            letterSpacing="0.4"
+          >
+            YOWUPENYU
+          </text>
 
-            {/* 2. Yellow/Gold Inner Motto Frame */}
-            <path
-              d="M 25,38 C 25,28 38,24 60,24 C 82,24 95,28 95,38 L 95,84 L 60,114 L 25,84 Z"
-              fill="#FBBF24"
-              stroke="#1F2937"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
+          {/* Bottom Left: TEMPILO */}
+          <text
+            x="70"
+            y="145"
+            fontSize="7.5"
+            fontWeight="900"
+            fontFamily="'Arial Black', sans-serif"
+            fill="#1E293B"
+            transform="rotate(40 70,145)"
+            textAnchor="middle"
+            letterSpacing="0.4"
+          >
+            TEMPILO
+          </text>
 
-            {/* 3. Motto Inscriptions */}
-            <text
-              fontSize="5.5"
-              fontWeight="900"
-              fontFamily="Arial, sans-serif"
-              fill="#1F2937"
-              textAnchor="middle"
-            >
-              <textPath href="#motto-top" startOffset="50%">
-                EDUCATION FOR LIFE
-              </textPath>
-            </text>
+          {/* Bottom Right: DZIDZO */}
+          <text
+            x="130"
+            y="145"
+            fontSize="7.5"
+            fontWeight="900"
+            fontFamily="'Arial Black', sans-serif"
+            fill="#1E293B"
+            transform="rotate(-40 130,145)"
+            textAnchor="middle"
+            letterSpacing="0.4"
+          >
+            DZIDZO
+          </text>
 
-            <text
-              x="29"
-              y="70"
-              fontSize="5.2"
-              fontWeight="900"
-              fontFamily="Arial, sans-serif"
-              fill="#1F2937"
-              transform="rotate(-90 29,70)"
-              textAnchor="middle"
-            >
-              IMFUNDO
-            </text>
+          {/* 5. CENTER WHITE SHIELD PLAQUE */}
+          <rect
+            x="58"
+            y="56"
+            width="84"
+            height="76"
+            rx="8"
+            fill="#FFFFFF"
+            stroke="#1E293B"
+            strokeWidth="2.5"
+          />
 
-            <text
-              x="91"
-              y="70"
-              fontSize="5.2"
-              fontWeight="900"
-              fontFamily="Arial, sans-serif"
-              fill="#1F2937"
-              transform="rotate(90 91,70)"
-              textAnchor="middle"
-            >
-              YOWUPENYU
-            </text>
+          {/* 6. RED CROWN AT TOP OF WHITE PLAQUE */}
+          <path
+            d="M 74,70 L 74,58 L 86,65 L 100,54 L 114,65 L 126,58 L 126,70 Z"
+            fill="#EF4444"
+            stroke="#1E293B"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
 
-            <text
-              x="40"
-              y="100"
-              fontSize="5.2"
-              fontWeight="900"
-              fontFamily="Arial, sans-serif"
-              fill="#1F2937"
-              transform="rotate(40 40,100)"
-              textAnchor="middle"
-            >
-              TEMPILO
-            </text>
-            <text
-              x="80"
-              y="100"
-              fontSize="5.2"
-              fontWeight="900"
-              fontFamily="Arial, sans-serif"
-              fill="#1F2937"
-              transform="rotate(-40 80,100)"
-              textAnchor="middle"
-            >
-              DZIDZO
-            </text>
+          {/* 7. RED OPEN BOOK EMBLEM WITH DADAYA */}
+          <path
+            d="M 64,82 C 78,75 94,78 100,83 C 106,78 122,75 136,82 L 136,104 C 122,97 106,100 100,105 C 94,100 78,97 64,104 Z"
+            fill="#EF4444"
+            stroke="#1E293B"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <line x1="100" y1="83" x2="100" y2="105" stroke="#1E293B" strokeWidth="2" />
 
-            {/* 4. Center White Plaque */}
-            <rect
-              x="34"
-              y="35"
-              width="52"
-              height="55"
-              rx="6"
-              fill="#FFFFFF"
-              stroke="#1F2937"
-              strokeWidth="1.8"
-            />
+          {/* DADAYA Text on the Book */}
+          <text
+            x="100"
+            y="96"
+            fontSize="10"
+            fontWeight="900"
+            fontFamily="'Arial Black', Impact, sans-serif"
+            fill="#111827"
+            textAnchor="middle"
+            letterSpacing="0.8"
+          >
+            DADAYA
+          </text>
 
-            {/* 5. Red Crown at top */}
-            <path
-              d="M 48,45 L 48,34 L 54,39 L 60,32 L 66,39 L 72,34 L 72,45 Z"
-              fill="#DC2626"
-              stroke="#1F2937"
-              strokeWidth="1.4"
-              strokeLinejoin="round"
-            />
+          {/* 8. RED PEN NIB */}
+          <path
+            d="M 96,105 L 104,105 L 101,126 L 99,126 Z"
+            fill="#EF4444"
+            stroke="#1E293B"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
 
-            {/* 6. Open Red Book Emblem with DADAYA text */}
-            <path
-              d="M 37,56 C 45,51 56,53 60,57 C 64,53 75,51 83,56 L 83,73 C 75,68 64,70 60,74 C 56,70 45,68 37,73 Z"
-              fill="#EF4444"
-              stroke="#1F2937"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            <line x1="60" y1="57" x2="60" y2="74" stroke="#1F2937" strokeWidth="1.5" />
+          {/* 9. BOTTOM TEXT: COMPLETE "HIGH" AND "SCHOOL" */}
+          {/* Left Arc: HIGH */}
+          <text
+            fontSize="15"
+            fontWeight="900"
+            fontFamily="'Arial Black', Impact, sans-serif"
+            fill="#0F172A"
+            letterSpacing="0.8"
+          >
+            <textPath href="#crest-high-path" startOffset="50%" textAnchor="middle">
+              HIGH
+            </textPath>
+          </text>
 
-            <text
-              x="60"
-              y="67"
-              fontSize="7.5"
-              fontWeight="900"
-              fontFamily="'Arial Black', Impact, sans-serif"
-              fill="#111827"
-              textAnchor="middle"
-            >
-              DADAYA
-            </text>
-
-            {/* 7. Red Pen Nib */}
-            <path
-              d="M 57,74 L 63,74 L 60.5,90 L 59.5,90 Z"
-              fill="#DC2626"
-              stroke="#1F2937"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-            />
-
-            {/* 8. Outer HIGH SCHOOL Text */}
-            <text
-              fontSize="9"
-              fontWeight="900"
-              fontFamily="'Arial Black', sans-serif"
-              fill="#111827"
-              textAnchor="end"
-            >
-              <textPath href="#high-path" startOffset="90%">
-                HIGH
-              </textPath>
-            </text>
-
-            <text
-              fontSize="9"
-              fontWeight="900"
-              fontFamily="'Arial Black', sans-serif"
-              fill="#111827"
-              textAnchor="start"
-            >
-              <textPath href="#school-path" startOffset="10%">
-                SCHOOL
-              </textPath>
-            </text>
-          </svg>
-        )}
+          {/* Right Arc: SCHOOL (Complete with S-C-H-O-O-L) */}
+          <text
+            fontSize="15"
+            fontWeight="900"
+            fontFamily="'Arial Black', Impact, sans-serif"
+            fill="#0F172A"
+            letterSpacing="0.8"
+          >
+            <textPath href="#crest-school-path" startOffset="50%" textAnchor="middle">
+              SCHOOL
+            </textPath>
+          </text>
+        </svg>
       </div>
 
       {showSubtitle && (
@@ -229,3 +245,5 @@ export const SchoolCrest: React.FC<SchoolCrestProps> = ({
     </div>
   );
 };
+
+

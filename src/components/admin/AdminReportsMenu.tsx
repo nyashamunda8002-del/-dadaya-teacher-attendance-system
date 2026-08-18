@@ -9,15 +9,27 @@ import {
   Printer,
   X,
   Sliders,
+  FileSpreadsheet,
+  Award,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from '../common/SchoolCrest';
+import { MoPSERegisterModal } from './MoPSERegisterModal';
 
 export const AdminReportsMenu: React.FC = () => {
   const { users, attendanceRecords, schoolSettings } = useApp();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [showMoPSEModal, setShowMoPSEModal] = useState(false);
 
   const reportItems = [
+    {
+      id: 'mopse',
+      title: 'Downloadable MoPSE Registers (Form ED 46)',
+      desc: 'Official Ministry of Primary & Secondary Education Zimbabwe staff duty & attendance registers',
+      icon: Award,
+      color: 'bg-emerald-100 text-emerald-950 border-emerald-300',
+      badge: 'MoPSE Statutory',
+    },
     {
       id: 'daily',
       title: 'Daily Report',
@@ -54,6 +66,14 @@ export const AdminReportsMenu: React.FC = () => {
       color: 'bg-amber-50 text-amber-700 border-amber-200',
     },
   ];
+
+  const handleReportClick = (id: string) => {
+    if (id === 'mopse') {
+      setShowMoPSEModal(true);
+    } else {
+      setSelectedReport(id);
+    }
+  };
 
   const handleExportCSV = () => {
     const headers = ['Date', 'Teacher', 'Subject', 'Clock In', 'Clock Out', 'Status', 'Duration (Mins)', 'Early Reason'];
@@ -97,15 +117,22 @@ export const AdminReportsMenu: React.FC = () => {
               key={item.id}
               whileHover={{ scale: 1.008 }}
               whileTap={{ scale: 0.99 }}
-              onClick={() => setSelectedReport(item.id)}
-              className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-blue-400 transition"
+              onClick={() => handleReportClick(item.id)}
+              className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-emerald-500 transition"
             >
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${item.color}`}>
                   <Icon className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
+                    {(item as any).badge && (
+                      <span className="px-2 py-0.2 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-[9px] uppercase tracking-wide border border-emerald-300">
+                        {(item as any).badge}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
               </div>
@@ -114,6 +141,11 @@ export const AdminReportsMenu: React.FC = () => {
           );
         })}
       </div>
+
+      {/* MoPSE Statutory Register Modal */}
+      {showMoPSEModal && (
+        <MoPSERegisterModal onClose={() => setShowMoPSEModal(false)} />
+      )}
 
       {/* Report Modal */}
       <AnimatePresence>

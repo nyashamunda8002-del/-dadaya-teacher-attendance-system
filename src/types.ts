@@ -110,3 +110,38 @@ export interface SchoolSettings {
   lockMessage?: string;
   soundEffectsEnabled?: boolean;
 }
+
+export type OfflineActionType = 'clock_in' | 'clock_out' | 'leave_request';
+
+export interface QueuedOfflineAction {
+  id: string;
+  type: OfflineActionType;
+  timestamp: number;
+  dateStr: string;
+  timeStr: string;
+  teacherId: string;
+  teacherName: string;
+  teacherSurname: string;
+  subject?: string;
+  payload: Record<string, any>;
+  status: 'pending' | 'syncing' | 'failed' | 'synced';
+  error?: string;
+}
+
+export interface MoPSERegisterRow {
+  index: number;
+  ecNumber: string;
+  fullName: string;
+  department: string;
+  gender: string;
+  dailyStatus: Record<number, string>; // day 1..31 -> 'P' | 'L' | 'OD' | 'SL' | 'CL' | 'A' | '-'
+  daysPresent: number;
+  daysLate: number;
+  daysOnDuty: number;
+  daysSickLeave: number;
+  daysAbsent: number;
+  totalWorkingDays: number;
+  attendanceRate: number; // e.g. 96.5%
+  remarks: string;
+}
+

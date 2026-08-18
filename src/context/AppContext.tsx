@@ -18,6 +18,7 @@ import {
   UserRole,
   LeaveRequest,
   LeaveStatus,
+  QueuedOfflineAction,
 } from '../types';
 import { soundEffects } from '../utils/soundEffects';
 
@@ -32,6 +33,12 @@ interface AppContextType {
   isFirebaseLinked: boolean;
   activeView: string;
   setActiveView: (view: string) => void;
+  isOnline: boolean;
+  offlineQueue: QueuedOfflineAction[];
+  offlineQueueCount: number;
+  isSyncingQueue: boolean;
+  syncOfflineQueue: () => Promise<{ success: boolean; syncedCount: number; message: string }>;
+  clearOfflineQueue: () => void;
   registerTeacher: (data: {
     name: string;
     surname: string;
@@ -57,12 +64,12 @@ interface AppContextType {
     reason?: string,
     isEarly?: boolean,
     coords?: { latitude: number; longitude: number }
-  ) => Promise<{ success: boolean; message: string; distance?: number }>;
+  ) => Promise<{ success: boolean; message: string; distance?: number; isOfflineQueued?: boolean }>;
   clockOut: (
     reason?: string,
     isEarly?: boolean,
     coords?: { latitude: number; longitude: number }
-  ) => Promise<{ success: boolean; message: string; distance?: number }>;
+  ) => Promise<{ success: boolean; message: string; distance?: number; isOfflineQueued?: boolean }>;
   clockInWithBadge: (badgeOrEmail: string) => Promise<{ success: boolean; message: string; user?: User }>;
   submitLeaveRequest: (
     data: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>
@@ -130,11 +137,32 @@ const STORAGE_KEYS = {
   USERS: 'dadaya_users_v2',
   NOTIFICATIONS: 'dadaya_notifications_v2',
   LEAVE: 'dadaya_leave_requests_v2',
+  OFFLINE_QUEUE: 'dadaya_offline_queue_v2',
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Network connectivity state
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  });
+
+  // Offline queue state
+  const [offlineQueue, setOfflineQueue] = useState<QueuedOfflineAction[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const [isSyncingQueue, setIsSyncingQueue] = useState<boolean>(false);
+
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (saved) {
@@ -545,6 +573,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(schoolSettings));
   }, [schoolSettings]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(offlineQueue));
+  }, [offlineQueue]);
+
+  // Network online/offline event listeners and auto-sync
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const getTodayDateStr = () => {
     const now = new Date();
     return now.toISOString().split('T')[0];
@@ -800,6 +850,115 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch((e) => console.warn(e));
   };
 
+  // Clear offline queue
+  const clearOfflineQueue = () => {
+    setOfflineQueue([]);
+    localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
+  };
+
+  // Sync offline queue to Firebase Firestore and Backend API
+  const syncOfflineQueue = async (): Promise<{ success: boolean; syncedCount: number; message: string }> => {
+    if (offlineQueue.length === 0) {
+      return { success: true, syncedCount: 0, message: 'Offline check-in queue is empty.' };
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return {
+        success: false,
+        syncedCount: 0,
+        message: 'Device is currently offline. Connect to the internet to synchronize queued records.',
+      };
+    }
+
+    setIsSyncingQueue(true);
+    let syncedCount = 0;
+    const remainingQueue: QueuedOfflineAction[] = [];
+
+    for (const item of offlineQueue) {
+      try {
+        if (item.type === 'clock_in' || item.type === 'clock_out') {
+          const rec = item.payload.record as AttendanceRecord;
+          const notif = item.payload.notification as EarlyClockNotification;
+
+          if (rec) {
+            await setDoc(doc(db, 'attendance', rec.id), rec);
+            fetch('/api/attendance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: rec.id,
+                teacherId: rec.userId,
+                teacherName: rec.teacherName,
+                teacherSurname: rec.teacherSurname,
+                subject: rec.subject,
+                date: rec.date,
+                clockInTime: rec.clockInTime,
+                clockInTimestamp: String(rec.clockInTimestamp || Date.now()),
+                clockOutTime: rec.clockOutTime,
+                clockOutTimestamp: rec.clockOutTimestamp ? String(rec.clockOutTimestamp) : null,
+                totalWorkingMinutes: rec.totalWorkingMinutes || 0,
+                status: rec.status,
+                earlyClockInReason: rec.earlyClockInReason || null,
+                earlyClockOutReason: rec.earlyClockOutReason || null,
+                clockInLatitude: rec.latitude,
+                clockInLongitude: rec.longitude,
+              }),
+            }).catch(() => null);
+          }
+
+          if (notif) {
+            await setDoc(doc(db, 'notifications', notif.id), notif);
+            fetch('/api/notifications', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(notif),
+            }).catch(() => null);
+          }
+          syncedCount++;
+        } else if (item.type === 'leave_request') {
+          const leave = item.payload.leave as LeaveRequest;
+          const notif = item.payload.notification as EarlyClockNotification;
+
+          if (leave) {
+            await setDoc(doc(db, 'leave_requests', leave.id), leave);
+            fetch('/api/leave-requests', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(leave),
+            }).catch(() => null);
+          }
+
+          if (notif) {
+            await setDoc(doc(db, 'notifications', notif.id), notif);
+            fetch('/api/notifications', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(notif),
+            }).catch(() => null);
+          }
+          syncedCount++;
+        }
+      } catch (err: any) {
+        console.warn('Failed to sync queue item:', item.id, err);
+        remainingQueue.push({ ...item, status: 'failed', error: err?.message || 'Network sync error' });
+      }
+    }
+
+    setOfflineQueue(remainingQueue);
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(remainingQueue));
+    setIsSyncingQueue(false);
+
+    if (syncedCount > 0 && schoolSettings.soundEffectsEnabled !== false) {
+      soundEffects.playBadgeScanSuccess();
+    }
+
+    return {
+      success: true,
+      syncedCount,
+      message: `Successfully synchronized ${syncedCount} queued record${syncedCount === 1 ? '' : 's'} to Dadaya High School Cloud.`,
+    };
+  };
+
   // Helper: Haversine distance calculation in meters
   const calculateDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3; // Earth radius in metres
@@ -884,37 +1043,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       longitude: effectiveLng,
     };
 
-    // Save to Firebase Firestore
-    try {
-      await setDoc(doc(db, 'attendance', recordId), newRecord);
-    } catch (firebaseErr) {
-      console.warn('Firebase attendance save error:', firebaseErr);
-    }
-
-    // Save to backend database
-    try {
-      await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: recordId,
-          teacherId: currentUser.id,
-          teacherName: currentUser.name,
-          teacherSurname: currentUser.surname,
-          subject: currentUser.subject,
-          date: dateStr,
-          clockInTime: timeStr,
-          clockInTimestamp: String(Date.now()),
-          status: newRecord.status,
-          earlyClockInReason: reason || null,
-          clockInLatitude: effectiveLat,
-          clockInLongitude: effectiveLng,
-        }),
-      });
-    } catch (e) {
-      console.warn('Attendance backend save error:', e);
-    }
-
     if (todayRecord) {
       setAttendanceRecords((prev) => prev.map((r) => (r.id === todayRecord.id ? newRecord : r)));
     } else {
@@ -949,6 +1077,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       acknowledgedByAdmin: false,
     };
 
+    setNotifications((prev) => [newNotification, ...prev]);
+
+    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    if (isCurrentlyOffline) {
+      const queueItem: QueuedOfflineAction = {
+        id: 'q_in_' + Date.now(),
+        type: 'clock_in',
+        timestamp: Date.now(),
+        dateStr,
+        timeStr,
+        teacherId: currentUser.id,
+        teacherName: currentUser.name,
+        teacherSurname: currentUser.surname,
+        subject: currentUser.subject,
+        payload: { record: newRecord, notification: newNotification },
+        status: 'pending',
+      };
+      setOfflineQueue((prev) => [...prev, queueItem]);
+
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playClockInSuccess();
+      }
+
+      return {
+        success: true,
+        isOfflineQueued: true,
+        distance: distanceToSchool,
+        message: `Offline Check-in Saved: Logged on device. It will automatically sync to Dadaya Cloud when internet connects.`,
+      };
+    }
+
+    // Save to Firebase Firestore
+    try {
+      await setDoc(doc(db, 'attendance', recordId), newRecord);
+    } catch (firebaseErr) {
+      console.warn('Firebase attendance save error, queueing offline:', firebaseErr);
+      const queueItem: QueuedOfflineAction = {
+        id: 'q_in_' + Date.now(),
+        type: 'clock_in',
+        timestamp: Date.now(),
+        dateStr,
+        timeStr,
+        teacherId: currentUser.id,
+        teacherName: currentUser.name,
+        teacherSurname: currentUser.surname,
+        subject: currentUser.subject,
+        payload: { record: newRecord, notification: newNotification },
+        status: 'pending',
+      };
+      setOfflineQueue((prev) => [...prev, queueItem]);
+    }
+
+    // Save to backend database
+    try {
+      await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: recordId,
+          teacherId: currentUser.id,
+          teacherName: currentUser.name,
+          teacherSurname: currentUser.surname,
+          subject: currentUser.subject,
+          date: dateStr,
+          clockInTime: timeStr,
+          clockInTimestamp: String(Date.now()),
+          status: newRecord.status,
+          earlyClockInReason: reason || null,
+          clockInLatitude: effectiveLat,
+          clockInLongitude: effectiveLng,
+        }),
+      });
+    } catch (e) {
+      console.warn('Attendance backend save error:', e);
+    }
+
     try {
       await setDoc(doc(db, 'notifications', newNotification.id), newNotification);
     } catch (firebaseErr) {
@@ -964,8 +1169,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('Notification save error:', e);
     }
-
-    setNotifications((prev) => [newNotification, ...prev]);
 
     if (schoolSettings.soundEffectsEnabled !== false) {
       soundEffects.playClockInSuccess();
@@ -1041,11 +1244,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       longitude: effectiveLng,
     };
 
+    setAttendanceRecords((prev) =>
+      prev.map((r) => (r.id === todayRecord.id ? updatedRecord : r))
+    );
+
+    // Generate notification for Admin on every clock out
+    const notifReason = isEarly && reason
+      ? `Early Departure: ${reason.trim()}`
+      : `Teacher clocked out on campus after ${Math.floor(workingMinutes / 60)}h ${workingMinutes % 60}m shift duty`;
+
+    const newNotification: EarlyClockNotification = {
+      id: 'notif_' + Date.now(),
+      recordId: todayRecord.id,
+      teacherId: currentUser.id,
+      teacherName: currentUser.name,
+      teacherSurname: currentUser.surname,
+      subject: currentUser.subject || 'General',
+      type: isEarly ? 'early_out' : 'clock_out',
+      time: timeStr,
+      date: dateStr,
+      timestamp: Date.now(),
+      reason: notifReason,
+      read: false,
+      acknowledgedByAdmin: false,
+    };
+
+    setNotifications((prev) => [newNotification, ...prev]);
+
+    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    if (isCurrentlyOffline) {
+      const queueItem: QueuedOfflineAction = {
+        id: 'q_out_' + Date.now(),
+        type: 'clock_out',
+        timestamp: Date.now(),
+        dateStr,
+        timeStr,
+        teacherId: currentUser.id,
+        teacherName: currentUser.name,
+        teacherSurname: currentUser.surname,
+        subject: currentUser.subject,
+        payload: { record: updatedRecord, notification: newNotification },
+        status: 'pending',
+      };
+      setOfflineQueue((prev) => [...prev, queueItem]);
+
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playClockOutSuccess();
+      }
+
+      return {
+        success: true,
+        isOfflineQueued: true,
+        distance: distanceToSchool,
+        message: `Offline Clock-Out Saved: Logged on device. It will automatically sync to Dadaya Cloud when internet connects.`,
+      };
+    }
+
     // Save to Firebase Firestore
     try {
       await setDoc(doc(db, 'attendance', todayRecord.id), updatedRecord);
     } catch (firebaseErr) {
-      console.warn('Firebase attendance clockout error:', firebaseErr);
+      console.warn('Firebase attendance clockout error, queueing offline:', firebaseErr);
+      const queueItem: QueuedOfflineAction = {
+        id: 'q_out_' + Date.now(),
+        type: 'clock_out',
+        timestamp: Date.now(),
+        dateStr,
+        timeStr,
+        teacherId: currentUser.id,
+        teacherName: currentUser.name,
+        teacherSurname: currentUser.surname,
+        subject: currentUser.subject,
+        payload: { record: updatedRecord, notification: newNotification },
+        status: 'pending',
+      };
+      setOfflineQueue((prev) => [...prev, queueItem]);
     }
 
     try {
@@ -1072,31 +1346,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Attendance clockout save error:', e);
     }
 
-    setAttendanceRecords((prev) =>
-      prev.map((r) => (r.id === todayRecord.id ? updatedRecord : r))
-    );
-
-    // Generate notification for Admin on every clock out
-    const notifReason = isEarly && reason
-      ? `Early Departure: ${reason.trim()}`
-      : `Teacher clocked out on campus after ${Math.floor(workingMinutes / 60)}h ${workingMinutes % 60}m shift duty`;
-
-    const newNotification: EarlyClockNotification = {
-      id: 'notif_' + Date.now(),
-      recordId: todayRecord.id,
-      teacherId: currentUser.id,
-      teacherName: currentUser.name,
-      teacherSurname: currentUser.surname,
-      subject: currentUser.subject || 'General',
-      type: isEarly ? 'early_out' : 'clock_out',
-      time: timeStr,
-      date: dateStr,
-      timestamp: Date.now(),
-      reason: notifReason,
-      read: false,
-      acknowledgedByAdmin: false,
-    };
-
     try {
       await setDoc(doc(db, 'notifications', newNotification.id), newNotification);
     } catch (firebaseErr) {
@@ -1112,8 +1361,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn(e);
     }
-
-    setNotifications((prev) => [newNotification, ...prev]);
 
     if (schoolSettings.soundEffectsEnabled !== false) {
       soundEffects.playClockOutSuccess();
@@ -1280,22 +1527,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       submittedAt: new Date().toISOString(),
     };
 
-    try {
-      await setDoc(doc(db, 'leave_requests', leaveId), newLeave);
-    } catch (err: any) {
-      console.warn('Firebase leave request save error:', err);
-    }
-
-    try {
-      await fetch('/api/leave-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newLeave),
-      });
-    } catch (e) {
-      console.warn('Leave request API save error:', e);
-    }
-
     setLeaveRequests((prev) => [newLeave, ...prev]);
 
     // Notify Admin of new leave request
@@ -1315,12 +1546,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       acknowledgedByAdmin: false,
     };
 
+    setNotifications((prev) => [notif, ...prev]);
+
+    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    if (isCurrentlyOffline) {
+      const queueItem: QueuedOfflineAction = {
+        id: 'q_lve_' + Date.now(),
+        type: 'leave_request',
+        timestamp: Date.now(),
+        dateStr: getTodayDateStr(),
+        timeStr: formatCurrentTime(),
+        teacherId: currentUser.id,
+        teacherName: currentUser.name,
+        teacherSurname: currentUser.surname,
+        subject: currentUser.subject,
+        payload: { leave: newLeave, notification: notif },
+        status: 'pending',
+      };
+      setOfflineQueue((prev) => [...prev, queueItem]);
+      return { success: true };
+    }
+
+    try {
+      await setDoc(doc(db, 'leave_requests', leaveId), newLeave);
+    } catch (err: any) {
+      console.warn('Firebase leave request save error, queueing offline:', err);
+      const queueItem: QueuedOfflineAction = {
+        id: 'q_lve_' + Date.now(),
+        type: 'leave_request',
+        timestamp: Date.now(),
+        dateStr: getTodayDateStr(),
+        timeStr: formatCurrentTime(),
+        teacherId: currentUser.id,
+        teacherName: currentUser.name,
+        teacherSurname: currentUser.surname,
+        subject: currentUser.subject,
+        payload: { leave: newLeave, notification: notif },
+        status: 'pending',
+      };
+      setOfflineQueue((prev) => [...prev, queueItem]);
+    }
+
+    try {
+      await fetch('/api/leave-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLeave),
+      });
+    } catch (e) {
+      console.warn('Leave request API save error:', e);
+    }
+
     try {
       await setDoc(doc(db, 'notifications', notif.id), notif);
     } catch (e) {
       console.warn(e);
     }
-    setNotifications((prev) => [notif, ...prev]);
 
     return { success: true };
   };
@@ -1802,6 +2084,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         viewMode,
         setViewMode,
         switchUserRole,
+        isOnline,
+        offlineQueue,
+        offlineQueueCount: offlineQueue.length,
+        isSyncingQueue,
+        syncOfflineQueue,
+        clearOfflineQueue,
       }}
     >
       {children}
