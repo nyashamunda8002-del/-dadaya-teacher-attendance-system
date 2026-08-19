@@ -621,6 +621,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     subject: string;
     email: string;
     password?: string;
+    ecNumber?: string;
   }) => {
     const trimmedEmail = data.email.trim().toLowerCase();
     const existing = users.find((u) => u.email.toLowerCase() === trimmedEmail);
@@ -628,7 +629,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'An account with this email already exists. Please log in.' };
     }
 
-    const employeeId = `DHS-T${Math.floor(1000 + Math.random() * 9000)}`;
+    const employeeId = data.ecNumber?.trim() || `DHS-T${Math.floor(1000 + Math.random() * 9000)}`;
     const newUser: User = {
       id: 'usr_' + Date.now(),
       name: data.name.trim(),
@@ -638,6 +639,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       password: data.password || 'password123',
       role: 'teacher',
       employeeId,
+      ecNumber: data.ecNumber?.trim() || employeeId,
       department: data.subject.trim() + ' Department',
       createdAt: new Date().toISOString(),
     };
@@ -1738,6 +1740,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addTeacherByAdmin = (teacherData: Partial<User>) => {
+    const ec = teacherData.ecNumber || teacherData.employeeId;
+    const employeeId = ec || `DHS-T${Math.floor(1000 + Math.random() * 9000)}`;
     const newTeacher: User = {
       id: 'usr_' + Date.now(),
       name: teacherData.name || 'New',
@@ -1746,7 +1750,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: teacherData.email || `teacher${Date.now()}@dadayahigh.ac.zw`,
       role: 'teacher',
       password: 'password123',
-      employeeId: `DHS-T${Math.floor(1000 + Math.random() * 9000)}`,
+      employeeId,
+      ecNumber: ec || employeeId,
       department: (teacherData.subject || 'General') + ' Department',
       createdAt: new Date().toISOString(),
     };

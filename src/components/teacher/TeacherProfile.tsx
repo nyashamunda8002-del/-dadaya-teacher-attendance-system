@@ -430,7 +430,7 @@ export const TeacherProfile: React.FC = () => {
               <div className="bg-slate-50 p-4 rounded-2xl text-xs text-gray-600 text-left space-y-2 border border-slate-100">
                 <p><strong>System:</strong> Dadaya High School Staff Attendance Portal</p>
                 <p><strong>Developer / Author:</strong> <span className="font-bold text-emerald-800">Nyasha Munda</span></p>
-                <p><strong>Institution:</strong> Dadaya High School, Shabani (Zvishavane), Zimbabwe</p>
+                <p><strong>Institution:</strong> Dadaya High School, Zvishavane, Zimbabwe</p>
                 <p><strong>Capabilities:</strong> Real-time GPS verification, Cloud SQL synchronization, Early departure admin alerts, and automated attendance reporting.</p>
               </div>
 

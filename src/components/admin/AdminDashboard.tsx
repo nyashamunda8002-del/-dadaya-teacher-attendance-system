@@ -12,12 +12,8 @@ import {
   ArrowUpRight,
   TrendingUp,
   BellRing,
-  Award,
-  Download,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { MoPSERegisterModal } from './MoPSERegisterModal';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -32,7 +28,6 @@ export const AdminDashboard: React.FC = () => {
   } = useApp();
 
   const [filterType, setFilterType] = useState<'all' | 'early' | 'late' | 'clock'>('all');
-  const [showMoPSEModal, setShowMoPSEModal] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const registeredTeachers = users.filter((u) => u.role === 'teacher');
@@ -160,42 +155,6 @@ export const AdminDashboard: React.FC = () => {
           <h3 className="text-xl sm:text-2xl font-black text-rose-600 mt-0.5">{absentCount}</h3>
         </div>
       </div>
-
-      {/* MoPSE Statutory Registers Quick Launch Banner */}
-      <div className="bg-linear-to-r from-emerald-900 via-teal-950 to-emerald-950 rounded-2xl p-3.5 sm:p-4 text-white flex items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-700/80 border border-emerald-400/30 flex items-center justify-center shrink-0">
-            <Award className="w-5 h-5 text-amber-300" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider">
-                MoPSE Compliant
-              </span>
-              <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight">
-                Downloadable MoPSE Registers
-              </h3>
-            </div>
-            <p className="text-[11px] text-emerald-200 mt-0.5 line-clamp-1">
-              Statutory Form ED 46 • Official Ministry of Primary & Secondary Education attendance ledgers
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowMoPSEModal(true)}
-          className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-bold text-xs flex items-center gap-1.5 transition shrink-0 select-none shadow-xs cursor-pointer"
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5 text-slate-950" />
-          <span className="hidden sm:inline">Open Registers</span>
-          <span className="sm:hidden">Open</span>
-        </button>
-      </div>
-
-      {/* MoPSE Modal */}
-      {showMoPSEModal && (
-        <MoPSERegisterModal onClose={() => setShowMoPSEModal(false)} />
-      )}
 
       {/* Live Attendance Alerts & Reason Notices */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">

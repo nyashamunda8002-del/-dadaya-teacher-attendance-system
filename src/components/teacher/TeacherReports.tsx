@@ -9,15 +9,13 @@ import {
   CheckCircle2,
   X,
   Building2,
-  Award,
-  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from '../common/SchoolCrest';
 
 export const TeacherReports: React.FC = () => {
   const { currentUser, attendanceRecords, schoolSettings } = useApp();
-  const [selectedReportType, setSelectedReportType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'mopse' | null>(null);
+  const [selectedReportType, setSelectedReportType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | null>(null);
 
   const myRecords = attendanceRecords.filter((r) => r.userId === currentUser?.id);
 
@@ -50,14 +48,6 @@ export const TeacherReports: React.FC = () => {
   };
 
   const reportCards = [
-    {
-      type: 'mopse' as const,
-      title: 'MoPSE Statutory Attendance Register (Form ED 46)',
-      desc: 'Official Ministry of Primary & Secondary Education faculty compliance ledger',
-      icon: Award,
-      color: 'bg-emerald-100 text-emerald-950 border-emerald-300',
-      badge: 'MoPSE Form ED 46',
-    },
     {
       type: 'daily' as const,
       title: 'Daily Report',
@@ -141,12 +131,10 @@ export const TeacherReports: React.FC = () => {
                   <SchoolCrest size="sm" />
                   <div>
                     <h3 className="font-bold text-base uppercase">
-                      {selectedReportType === 'mopse' ? 'MoPSE Form ED 46 Statutory Staff Register' : `${selectedReportType.toUpperCase()} ATTENDANCE REPORT`}
+                      {selectedReportType.toUpperCase()} ATTENDANCE REPORT
                     </h3>
                     <p className="text-emerald-300 text-xs font-mono">
-                      {selectedReportType === 'mopse'
-                        ? 'Ministry of Primary & Secondary Education Zimbabwe'
-                        : 'Dadaya High School Official Academic Record'}
+                      Dadaya High School Official Academic Record
                     </p>
                   </div>
                 </div>
@@ -160,19 +148,6 @@ export const TeacherReports: React.FC = () => {
 
               {/* Printable Body */}
               <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-                {selectedReportType === 'mopse' && (
-                  <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl space-y-1 text-[11px] text-emerald-950">
-                    <div className="flex items-center gap-1.5 font-bold uppercase text-emerald-900">
-                      <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                      <span>Republic of Zimbabwe • MoPSE Statutory Compliance</span>
-                    </div>
-                    <p>
-                      Official Form ED 46 individual staff record for Shabani District, Midlands Province.
-                      Responsible Authority: Church of Christ.
-                    </p>
-                  </div>
-                )}
-
                 {/* School Header Banner */}
                 <div className="border-b border-gray-200 pb-4 flex items-center justify-between">
                   <div>

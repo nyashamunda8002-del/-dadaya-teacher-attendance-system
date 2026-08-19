@@ -7,7 +7,6 @@ import { Header } from './components/common/Header';
 import { Navigation } from './components/common/Navigation';
 import { AndroidInstallBanner } from './components/common/AndroidInstallBanner';
 import { TeacherAiAssistant } from './components/common/TeacherAiAssistant';
-import { OfflineQueueBar } from './components/common/OfflineQueueBar';
 import { triggerHaptic } from './utils/haptics';
 
 // Teacher Views
@@ -112,7 +111,6 @@ const MainAppContent: React.FC = () => {
 
       {/* Main Content Area - Optimized for mobile touch & desktop readability */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6 pb-24 md:pb-12">
-        <OfflineQueueBar />
         <AnimatePresence mode="wait">
           <motion.div
             key={activeView + '-' + currentUser.role}

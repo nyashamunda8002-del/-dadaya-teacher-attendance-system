@@ -27,6 +27,7 @@ export const AdminTeachers: React.FC = () => {
   // New teacher form state
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
+  const [ecNumber, setEcNumber] = useState('');
   const [subject, setSubject] = useState('');
   const [email, setEmail] = useState('');
 
@@ -34,7 +35,7 @@ export const AdminTeachers: React.FC = () => {
   const registeredTeachers = users.filter((u) => u.role === 'teacher');
 
   const filteredTeachers = registeredTeachers.filter((t) => {
-    const full = `${t.name} ${t.surname} ${t.subject || ''} ${t.email}`.toLowerCase();
+    const full = `${t.name} ${t.surname} ${t.subject || ''} ${t.email} ${t.ecNumber || t.employeeId || ''}`.toLowerCase();
     return full.includes(searchQuery.toLowerCase());
   });
 
@@ -47,10 +48,12 @@ export const AdminTeachers: React.FC = () => {
       surname: surname.trim(),
       subject: subject.trim() || 'General Studies',
       email: email.trim() || `${name.toLowerCase()}.${surname.toLowerCase()}@dadayahigh.ac.zw`,
+      ecNumber: ecNumber.trim() || undefined,
     });
 
     setName('');
     setSurname('');
+    setEcNumber('');
     setSubject('');
     setEmail('');
     setShowAddModal(false);
@@ -137,7 +140,12 @@ export const AdminTeachers: React.FC = () => {
                     <h3 className="font-bold text-gray-900 text-sm">
                       {teacher.name} {teacher.surname}
                     </h3>
-                    <p className="text-xs text-blue-900 font-semibold">{teacher.subject || 'General'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-blue-900 font-semibold">{teacher.subject || 'General'}</span>
+                      <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-bold">
+                        EC: {teacher.ecNumber || teacher.employeeId}
+                      </span>
+                    </div>
                     <p className="text-[11px] text-gray-400">{teacher.email}</p>
                   </div>
                 </div>
@@ -199,6 +207,16 @@ export const AdminTeachers: React.FC = () => {
                     onChange={(e) => setSurname(e.target.value)}
                     required
                     className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">EC Number (Employment Code)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. EC-748291"
+                    value={ecNumber}
+                    onChange={(e) => setEcNumber(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm uppercase"
                   />
                 </div>
                 <div>

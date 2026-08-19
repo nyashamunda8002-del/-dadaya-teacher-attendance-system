@@ -9,27 +9,15 @@ import {
   Printer,
   X,
   Sliders,
-  FileSpreadsheet,
-  Award,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from '../common/SchoolCrest';
-import { MoPSERegisterModal } from './MoPSERegisterModal';
 
 export const AdminReportsMenu: React.FC = () => {
   const { users, attendanceRecords, schoolSettings } = useApp();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
-  const [showMoPSEModal, setShowMoPSEModal] = useState(false);
 
   const reportItems = [
-    {
-      id: 'mopse',
-      title: 'Downloadable MoPSE Registers (Form ED 46)',
-      desc: 'Official Ministry of Primary & Secondary Education Zimbabwe staff duty & attendance registers',
-      icon: Award,
-      color: 'bg-emerald-100 text-emerald-950 border-emerald-300',
-      badge: 'MoPSE Statutory',
-    },
     {
       id: 'daily',
       title: 'Daily Report',
@@ -68,11 +56,7 @@ export const AdminReportsMenu: React.FC = () => {
   ];
 
   const handleReportClick = (id: string) => {
-    if (id === 'mopse') {
-      setShowMoPSEModal(true);
-    } else {
-      setSelectedReport(id);
-    }
+    setSelectedReport(id);
   };
 
   const handleExportCSV = () => {
@@ -141,11 +125,6 @@ export const AdminReportsMenu: React.FC = () => {
           );
         })}
       </div>
-
-      {/* MoPSE Statutory Register Modal */}
-      {showMoPSEModal && (
-        <MoPSERegisterModal onClose={() => setShowMoPSEModal(false)} />
-      )}
 
       {/* Report Modal */}
       <AnimatePresence>

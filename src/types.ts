@@ -11,6 +11,7 @@ export interface User {
   password?: string;
   phone?: string;
   employeeId: string;
+  ecNumber?: string;
   department?: string;
   avatarUrl?: string;
   theme?: ThemeMode;
