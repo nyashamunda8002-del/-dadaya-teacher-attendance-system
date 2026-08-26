@@ -432,28 +432,6 @@ User Question: "${prompt}"`,
     }
   });
 
-  // --- API: Direct Android App Package / Installer Download Endpoint ---
-  app.get('/api/download-app', (req, res) => {
-    // Generates/serves standard Android Web App bundle descriptor package
-    const appPackage = {
-      appName: 'Dadaya High School Attendance',
-      packageName: 'org.dadayahighschool.attendance',
-      version: '1.0.4',
-      platform: 'Android',
-      minSdkVersion: 24,
-      targetSdkVersion: 34,
-      author: 'Dadaya High School IT Department',
-      startUrl: 'https://ais-dev-p4bxvhlqlir4lanq62t7ov-940704209154.europe-west2.run.app',
-      themeColor: '#064e3b',
-      permissions: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'VIBRATE', 'INTERNET'],
-      installedAt: new Date().toISOString()
-    };
-
-    res.setHeader('Content-Disposition', 'attachment; filename="DadayaAttendance-v1.0.4.apk"');
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.send(Buffer.from(JSON.stringify(appPackage, null, 2)));
-  });
-
   // --- Vite / Frontend Middleware ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
