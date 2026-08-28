@@ -2,13 +2,14 @@
  * Android & Mobile Haptic Vibration Feedback Utilities
  */
 
-export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'light') => {
+export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection' = 'light') => {
   if (typeof window === 'undefined' || !('vibrate' in navigator)) {
     return;
   }
 
   try {
     switch (type) {
+      case 'selection':
       case 'light':
         navigator.vibrate(15);
         break;

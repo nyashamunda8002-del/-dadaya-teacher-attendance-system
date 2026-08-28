@@ -21,6 +21,8 @@ import {
   QueuedOfflineAction,
 } from '../types';
 import { soundEffects } from '../utils/soundEffects';
+import { sendPhoneNotification, initializeBackgroundNotificationService } from '../utils/phoneNotifications';
+import { evaluateAttendanceEligibility } from '../utils/zimbabweCalendar';
 
 interface AppContextType {
   currentUser: User | null;
@@ -52,6 +54,11 @@ interface AppContextType {
     email: string;
     password?: string;
   }) => Promise<{ success: boolean; error?: string }>;
+  findTeacherByEcNumber: (ecNumber: string) => Promise<{ success: boolean; user?: User; error?: string }>;
+  resetTeacherPasswordWithEcNumber: (
+    ecNumber: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; error?: string; user?: User }>;
   loginUser: (
     email: string,
     password?: string,
@@ -91,11 +98,18 @@ interface AppContextType {
   viewMode: 'desktop' | 'mobile-frame';
   setViewMode: (mode: 'desktop' | 'mobile-frame') => void;
   switchUserRole: (role: UserRole) => void;
+  isSchoolDay: (date?: Date) => boolean;
+  isWeekend: (date?: Date) => boolean;
+  currentDayName: string;
 }
 
 const DEFAULT_SETTINGS: SchoolSettings = {
   schoolName: 'Dadaya High School',
   academicYear: '2026 Academic Year',
+  currentTerm: 'Term 1',
+  termStartDate: '2026-01-13',
+  termEndDate: '2026-04-10',
+  termNotes: 'First Term 2026 - Academic & Co-curricular sessions',
   standardClockInTime: '07:30',
   standardClockOutTime: '15:30',
   lateGracePeriodMinutes: 15,
@@ -106,6 +120,8 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   allowedRadiusMeters: 100,
   requireLocation: true,
   lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
+  soundEffectsEnabled: true,
+  phoneNotificationsEnabled: true,
 };
 
 export const DADAYA_ADMIN_CREDENTIALS = {
@@ -294,6 +310,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setActiveViewState(view);
   };
+
+  // Background notification service initialization (public holiday greetings & reminders)
+  useEffect(() => {
+    const cleanup = initializeBackgroundNotificationService();
+    return () => {
+      cleanup();
+    };
+  }, []);
 
   // Live real-time Firestore synchronization & backend loading
   useEffect(() => {
@@ -829,6 +853,104 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  // Teacher Account Recovery: Find Teacher by EC Number
+  const findTeacherByEcNumber = async (ecNumberInput: string): Promise<{ success: boolean; user?: User; error?: string }> => {
+    const rawInput = ecNumberInput.trim();
+    const queryEc = rawInput.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!queryEc) {
+      return { success: false, error: 'Please enter your EC Number (Employment Code).' };
+    }
+
+    // 1. Search in local state users
+    let match = users.find((u) => {
+      if (u.role !== 'teacher') return false;
+      const uEc = (u.ecNumber || u.employeeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return uEc === queryEc || uEc.endsWith(queryEc) || queryEc.endsWith(uEc);
+    });
+
+    // 2. If not found in memory, query Firestore directly
+    if (!match) {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        for (const docSnap of snap.docs) {
+          const u = { id: docSnap.id, ...docSnap.data() } as User;
+          if (u.role === 'teacher') {
+            const uEc = (u.ecNumber || u.employeeId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (uEc === queryEc || uEc.endsWith(queryEc) || queryEc.endsWith(uEc)) {
+              match = u;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error querying Firestore for teacher EC number:', e);
+      }
+    }
+
+    if (match) {
+      return { success: true, user: match };
+    } else {
+      return {
+        success: false,
+        error: `No teacher record found with EC Number "${rawInput}". Please verify your employment code or contact school administration.`,
+      };
+    }
+  };
+
+  // Reset Teacher Password with EC Number
+  const resetTeacherPasswordWithEcNumber = async (
+    ecNumberInput: string,
+    newPassword: string
+  ): Promise<{ success: boolean; error?: string; user?: User }> => {
+    const findRes = await findTeacherByEcNumber(ecNumberInput);
+    if (!findRes.success || !findRes.user) {
+      return { success: false, error: findRes.error || 'Teacher account not found' };
+    }
+
+    const teacher = findRes.user;
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false, error: 'Password must be at least 4 characters.' };
+    }
+
+    const cleanPassword = newPassword.trim();
+    const updatedUser: User = {
+      ...teacher,
+      password: cleanPassword,
+    };
+
+    // Update in local state
+    setUsers((prev) => prev.map((u) => (u.id === teacher.id ? updatedUser : u)));
+
+    // Update in Firestore
+    try {
+      await updateDoc(doc(db, 'users', teacher.id), {
+        password: cleanPassword,
+      });
+    } catch (fsErr) {
+      console.warn('Firestore updateDoc failed, attempting setDoc merge:', fsErr);
+      try {
+        await setDoc(doc(db, 'users', teacher.id), updatedUser, { merge: true });
+      } catch {}
+    }
+
+    // Update backend API
+    try {
+      await fetch(`/api/users/${teacher.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: cleanPassword }),
+      });
+    } catch {}
+
+    sendPhoneNotification({
+      title: '🔑 Teacher Password Updated',
+      body: `Password for ${teacher.name} ${teacher.surname} (${teacher.ecNumber || teacher.employeeId}) has been successfully updated.`,
+      tag: `pwd-reset-${teacher.id}`,
+    });
+
+    return { success: true, user: updatedUser };
+  };
+
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
@@ -977,6 +1099,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Math.round(R * c);
   };
 
+  // Helper: School days (Monday=1 through Friday=5) vs Weekend (Saturday=6, Sunday=0)
+  const isSchoolDay = (date: Date = new Date()): boolean => {
+    const day = date.getDay();
+    return day >= 1 && day <= 5; // Monday to Friday
+  };
+
+  const isWeekend = (date: Date = new Date()): boolean => {
+    return !isSchoolDay(date);
+  };
+
+  const currentDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
   // Clock In
   const clockIn = async (
     reason?: string,
@@ -987,6 +1121,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const dateStr = getTodayDateStr();
     const timeStr = formatCurrentTime();
     const now = new Date();
+
+    // Strictly enforce Zimbabwe MoPSE School Terms, Public Holidays, and School Days (Mon-Fri)
+    const eligibility = evaluateAttendanceEligibility(now, schoolSettings);
+    if (!eligibility.canClock) {
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playErrorBeep();
+      }
+      return {
+        success: false,
+        message: eligibility.reason,
+      };
+    }
 
     if (todayRecord && todayRecord.clockInTime) {
       return {
@@ -1176,6 +1322,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       soundEffects.playClockInSuccess();
     }
 
+    // Dispatch instant native phone notification
+    sendPhoneNotification({
+      title: isLate ? '⚠️ Late Clock-In Logged' : (isEarly ? '⏱️ Early Clock-In Notice' : '✅ Clock-In Verified'),
+      body: `${currentUser.name} ${currentUser.surname} clocked in at ${timeStr} (${currentUser.subject || 'Faculty'}). Dadaya High School campus GPS verified.`,
+      tag: `clockin-${currentUser.id}-${dateStr}`,
+    });
+
     return {
       success: true,
       distance: distanceToSchool,
@@ -1192,6 +1345,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) return { success: false, message: 'No user active' };
     const dateStr = getTodayDateStr();
     const timeStr = formatCurrentTime();
+    const now = new Date();
+
+    // Strictly enforce Zimbabwe MoPSE School Terms, Public Holidays, and School Days (Mon-Fri)
+    const eligibility = evaluateAttendanceEligibility(now, schoolSettings);
+    if (!eligibility.canClock) {
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playErrorBeep();
+      }
+      return {
+        success: false,
+        message: eligibility.reason,
+      };
+    }
 
     if (!todayRecord || !todayRecord.clockInTime) {
       return { success: false, message: 'You must clock in first before clocking out.' };
@@ -1368,6 +1534,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       soundEffects.playClockOutSuccess();
     }
 
+    // Dispatch instant native phone notification
+    sendPhoneNotification({
+      title: isEarly ? '⏱️ Early Clock-Out Notice' : '👋 Clock-Out Confirmed',
+      body: `${currentUser.name} ${currentUser.surname} clocked out at ${timeStr}. Duty shift duration: ${Math.floor(workingMinutes / 60)}h ${workingMinutes % 60}m.`,
+      tag: `clockout-${currentUser.id}-${dateStr}`,
+    });
+
     return {
       success: true,
       distance: distanceToSchool,
@@ -1380,6 +1553,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     badgeOrEmail: string,
     coords?: { latitude: number; longitude: number }
   ) => {
+    const now = new Date();
+    // Strictly enforce Zimbabwe MoPSE School Terms, Public Holidays, and School Days (Mon-Fri)
+    const eligibility = evaluateAttendanceEligibility(now, schoolSettings);
+    if (!eligibility.canClock) {
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playErrorBeep();
+      }
+      return {
+        success: false,
+        message: eligibility.reason,
+      };
+    }
+
     const query = badgeOrEmail.trim().toLowerCase();
     const targetUser = users.find(
       (u) =>
@@ -1425,7 +1611,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const dateStr = getTodayDateStr();
     const timeStr = formatCurrentTime();
-    const now = new Date();
 
     const existingRec = attendanceRecords.find(
       (r) => r.userId === targetUser.id && r.date === dateStr
@@ -1606,6 +1791,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn(e);
     }
 
+    sendPhoneNotification({
+      title: '📋 Leave Application Submitted',
+      body: `${currentUser.name} ${currentUser.surname} applied for ${data.leaveType.toUpperCase()} leave (${data.startDate} to ${data.endDate}).`,
+      tag: `leave-${newLeave.id}`,
+    });
+
     return { success: true };
   };
 
@@ -1614,6 +1805,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status: LeaveStatus,
     adminNotes?: string
   ) => {
+    const target = leaveRequests.find((l) => l.id === id);
     const updated = leaveRequests.map((l) =>
       l.id === id
         ? {
@@ -1626,6 +1818,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : l
     );
     setLeaveRequests(updated);
+
+    if (target) {
+      sendPhoneNotification({
+        title: status === 'approved' ? '✅ Leave Request Approved' : '❌ Leave Request Declined',
+        body: `Leave request for ${target.teacherName} ${target.teacherSurname} (${target.leaveType}) was marked as ${status}.`,
+        tag: `leave-update-${id}`,
+      });
+    }
 
     try {
       await updateDoc(doc(db, 'leave_requests', id), {
@@ -1683,6 +1883,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       read: false,
       acknowledgedByAdmin: false,
     };
+
+    sendPhoneNotification({
+      title: type === 'early_in' ? '⏱️ Early Clock-In Notice' : '⏱️ Early Departure Notice',
+      body: `${currentUser.name} ${currentUser.surname}: ${reason.trim()}`,
+      tag: `notice-${notif.id}`,
+    });
 
     // Save to Firebase Firestore
     try {
@@ -2064,6 +2270,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveView,
         registerTeacher,
         registerAdmin,
+        findTeacherByEcNumber,
+        resetTeacherPasswordWithEcNumber,
         loginUser,
         logout,
         updateUserProfile,
@@ -2095,6 +2303,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSyncingQueue,
         syncOfflineQueue,
         clearOfflineQueue,
+        isSchoolDay,
+        isWeekend,
+        currentDayName,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 {
   "name": "Dadaya High School Attendance System",
-  "description": "Comprehensive Android and mobile school attendance tracking application with Teacher and Admin flows, early clocking notifications, location-based check-in, reports, and auto-login.",
+  "description": "Dadaya High School Teacher & Admin Attendance System with Zimbabwe MoPSE calendar compliance, termly reports, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

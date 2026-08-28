@@ -15,15 +15,20 @@ import {
   Sparkles,
   KeyRound,
   Shield,
+  HelpCircle,
+  RotateCcw,
+  Check,
+  Search,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from '../common/SchoolCrest';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const AuthScreen: React.FC = () => {
-  const { registerTeacher, loginUser } = useApp();
+  const { registerTeacher, loginUser, findTeacherByEcNumber, resetTeacherPasswordWithEcNumber } = useApp();
 
   const [role, setRole] = useState<'teacher' | 'admin'>('teacher');
-  const [teacherMode, setTeacherMode] = useState<'signup' | 'login'>('signup');
+  const [teacherMode, setTeacherMode] = useState<'signup' | 'login' | 'forgot-password'>('signup');
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
   const [createdUserName, setCreatedUserName] = useState('');
 
@@ -35,6 +40,15 @@ export const AuthScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Teacher Account Recovery / Forgot Password states
+  const [recoveryEcNumber, setRecoveryEcNumber] = useState('');
+  const [foundTeacher, setFoundTeacher] = useState<any | null>(null);
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState('');
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [isVerifyingEc, setIsVerifyingEc] = useState(false);
+  const [recoverySuccessMsg, setRecoverySuccessMsg] = useState('');
 
   // Admin Login states (Admin has email and password ONLY)
   const [adminEmail, setAdminEmail] = useState('');
@@ -116,6 +130,89 @@ export const AuthScreen: React.FC = () => {
       });
     } catch {
       setErrorMsg('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Teacher Account Recovery: Verify EC Number
+  const handleVerifyEcNumber = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setRecoverySuccessMsg('');
+
+    if (!recoveryEcNumber.trim()) {
+      setErrorMsg('Please enter your EC Number (Employment Code).');
+      return;
+    }
+
+    setIsVerifyingEc(true);
+    triggerHaptic('light');
+
+    try {
+      const res = await findTeacherByEcNumber(recoveryEcNumber);
+      if (!res.success || !res.user) {
+        setErrorMsg(res.error || 'No teacher account found with this EC number.');
+        setFoundTeacher(null);
+        triggerHaptic('error');
+      } else {
+        setFoundTeacher(res.user);
+        triggerHaptic('success');
+      }
+    } catch {
+      setErrorMsg('Error verifying EC number. Please try again.');
+      triggerHaptic('error');
+    } finally {
+      setIsVerifyingEc(false);
+    }
+  };
+
+  // Teacher Account Recovery: Submit New Password
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (!foundTeacher) {
+      setErrorMsg('Please verify your EC Number first.');
+      return;
+    }
+
+    if (!recoveryNewPassword.trim() || recoveryNewPassword.length < 4) {
+      setErrorMsg('New password must be at least 4 characters long.');
+      return;
+    }
+
+    if (recoveryNewPassword !== recoveryConfirmPassword) {
+      setErrorMsg('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    triggerHaptic('medium');
+
+    try {
+      const res = await resetTeacherPasswordWithEcNumber(recoveryEcNumber, recoveryNewPassword);
+      if (!res.success || !res.user) {
+        setErrorMsg(res.error || 'Failed to update password.');
+        triggerHaptic('error');
+      } else {
+        setRecoverySuccessMsg(`Password for ${res.user.name} ${res.user.surname} updated successfully!`);
+        triggerHaptic('success');
+        confetti({
+          particleCount: 60,
+          spread: 60,
+          origin: { y: 0.6 },
+          colors: ['#047857', '#10B981', '#F59E0B'],
+        });
+
+        // Automatically log in with the new password after brief pause
+        setTimeout(async () => {
+          await loginUser(res.user!.email, recoveryNewPassword, 'teacher');
+        }, 1400);
+      }
+    } catch {
+      setErrorMsg('An unexpected error occurred while resetting password.');
+      triggerHaptic('error');
     } finally {
       setIsSubmitting(false);
     }
@@ -550,7 +647,7 @@ export const AuthScreen: React.FC = () => {
                       {isSubmitting ? 'Creating Account...' : 'SIGN UP'}
                     </button>
                   </motion.form>
-                ) : (
+                ) : teacherMode === 'login' ? (
                   <motion.form
                     key="teacher-login-form"
                     initial={{ opacity: 0, x: 10 }}
@@ -580,9 +677,27 @@ export const AuthScreen: React.FC = () => {
 
                     {/* Password */}
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Password
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-gray-700">
+                          Password
+                        </label>
+                        <button
+                          id="forgot-password-btn"
+                          type="button"
+                          onClick={() => {
+                            setTeacherMode('forgot-password');
+                            setErrorMsg('');
+                            setFoundTeacher(null);
+                            setRecoverySuccessMsg('');
+                            setRecoveryEcNumber('');
+                            setRecoveryNewPassword('');
+                            setRecoveryConfirmPassword('');
+                          }}
+                          className="text-[11px] font-semibold text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
                       <div className="relative flex items-center">
                         <Lock className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
                         <input
@@ -613,11 +728,221 @@ export const AuthScreen: React.FC = () => {
                       id="submit-teacher-login-btn"
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full mt-3 py-3 px-4 rounded-xl font-bold text-white text-sm shadow-md bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 shadow-emerald-100 transition duration-150 uppercase tracking-wider"
+                      className="w-full mt-3 py-3 px-4 rounded-xl font-bold text-white text-sm shadow-md bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 shadow-emerald-100 transition duration-150 uppercase tracking-wider cursor-pointer"
                     >
                       {isSubmitting ? 'Signing in...' : 'LOG IN'}
                     </button>
+
+                    {/* Quick EC Number Recovery Shortcut */}
+                    <div className="pt-2 text-center">
+                      <button
+                        id="recover-via-ec-btn"
+                        type="button"
+                        onClick={() => {
+                          setTeacherMode('forgot-password');
+                          setErrorMsg('');
+                          setFoundTeacher(null);
+                          setRecoverySuccessMsg('');
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-emerald-800 font-medium cursor-pointer"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Recover teacher account using <strong>EC Number</strong></span>
+                      </button>
+                    </div>
                   </motion.form>
+                ) : (
+                  /* Forgot Password / Account Recovery using EC Number */
+                  <motion.div
+                    key="teacher-recovery-form"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="space-y-4"
+                  >
+                    {/* Recovery Header */}
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-start gap-2.5">
+                      <KeyRound className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide">
+                          Teacher Account Recovery
+                        </h4>
+                        <p className="text-[11px] text-emerald-800 leading-snug mt-0.5">
+                          Enter your official Dadaya High School <strong>EC Number</strong> (Employment Code) to verify your account and set a new password.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Success Notice if reset */}
+                    {recoverySuccessMsg && (
+                      <div className="p-3 bg-emerald-100 border border-emerald-300 rounded-xl text-xs text-emerald-900 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span>{recoverySuccessMsg} Logging you in...</span>
+                      </div>
+                    )}
+
+                    {/* STEP 1: Verify EC Number */}
+                    <form onSubmit={handleVerifyEcNumber} className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Official EC Number / Employment Code
+                        </label>
+                        <div className="relative flex items-center">
+                          <ShieldCheck className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+                          <input
+                            id="recovery-ec-number-input"
+                            type="text"
+                            placeholder="e.g. EC-748291 or 748291"
+                            value={recoveryEcNumber}
+                            onChange={(e) => {
+                              setRecoveryEcNumber(e.target.value);
+                              if (foundTeacher) setFoundTeacher(null);
+                            }}
+                            required
+                            disabled={isVerifyingEc || !!foundTeacher}
+                            className={`w-full pl-9 pr-3 py-2.5 bg-slate-50 border rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition font-mono ${
+                              foundTeacher ? 'border-emerald-500 bg-emerald-50/50' : 'border-gray-200'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {!foundTeacher && (
+                        <button
+                          id="verify-ec-btn"
+                          type="submit"
+                          disabled={isVerifyingEc || !recoveryEcNumber.trim()}
+                          className="w-full py-2.5 px-4 rounded-xl font-bold text-white text-xs bg-emerald-800 hover:bg-emerald-900 active:scale-[0.99] transition duration-150 flex items-center justify-center gap-2 shadow-xs cursor-pointer uppercase tracking-wider"
+                        >
+                          {isVerifyingEc ? (
+                            <>
+                              <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Searching School Records...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Search className="w-3.5 h-3.5" />
+                              <span>Verify EC Number</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </form>
+
+                    {/* STEP 2: Found Teacher Verified Card */}
+                    {foundTeacher && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-4"
+                      >
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-emerald-700 text-white font-black text-xs flex items-center justify-center">
+                                {foundTeacher.name.charAt(0)}
+                                {foundTeacher.surname.charAt(0)}
+                              </div>
+                              <div>
+                                <h5 className="text-xs font-bold text-slate-900">
+                                  {foundTeacher.name} {foundTeacher.surname}
+                                </h5>
+                                <p className="text-[11px] text-slate-500">
+                                  {foundTeacher.subject || foundTeacher.department || 'Academic Staff'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full">
+                              <Check className="w-3 h-3 text-emerald-700" />
+                              Verified
+                            </span>
+                          </div>
+                          <div className="mt-2 text-[11px] text-slate-600 flex justify-between">
+                            <span>Email: <strong className="text-slate-800">{foundTeacher.email}</strong></span>
+                            <span>EC: <strong className="font-mono text-emerald-800">{foundTeacher.ecNumber || foundTeacher.employeeId}</strong></span>
+                          </div>
+                        </div>
+
+                        {/* STEP 3: Enter New Password */}
+                        <form onSubmit={handleResetPasswordSubmit} className="space-y-3 pt-1">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Enter New Password
+                            </label>
+                            <div className="relative flex items-center">
+                              <Lock className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+                              <input
+                                id="recovery-new-password-input"
+                                type={showRecoveryPassword ? 'text' : 'password'}
+                                placeholder="Create a new password (min 4 chars)"
+                                value={recoveryNewPassword}
+                                onChange={(e) => setRecoveryNewPassword(e.target.value)}
+                                required
+                                minLength={4}
+                                className="w-full pl-9 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowRecoveryPassword(!showRecoveryPassword)}
+                                className="absolute right-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                              >
+                                {showRecoveryPassword ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Confirm New Password
+                            </label>
+                            <div className="relative flex items-center">
+                              <Lock className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+                              <input
+                                id="recovery-confirm-password-input"
+                                type={showRecoveryPassword ? 'text' : 'password'}
+                                placeholder="Re-enter your new password"
+                                value={recoveryConfirmPassword}
+                                onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
+                                required
+                                minLength={4}
+                                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition"
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            id="submit-reset-password-btn"
+                            type="submit"
+                            disabled={isSubmitting || !recoveryNewPassword}
+                            className="w-full mt-2 py-3 px-4 rounded-xl font-bold text-white text-sm shadow-md bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 shadow-emerald-100 transition duration-150 uppercase tracking-wider cursor-pointer"
+                          >
+                            {isSubmitting ? 'Updating Password...' : 'Save New Password & Log In'}
+                          </button>
+                        </form>
+                      </motion.div>
+                    )}
+
+                    {/* Back to Login Button */}
+                    <div className="pt-2 text-center">
+                      <button
+                        id="back-to-login-btn"
+                        type="button"
+                        onClick={() => {
+                          setTeacherMode('login');
+                          setErrorMsg('');
+                          setFoundTeacher(null);
+                          setRecoverySuccessMsg('');
+                        }}
+                        className="text-xs font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
+                      >
+                        ← Back to Teacher Login
+                      </button>
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
 
@@ -633,12 +958,12 @@ export const AuthScreen: React.FC = () => {
                         setTeacherMode('login');
                         setErrorMsg('');
                       }}
-                      className="font-bold text-emerald-800 hover:text-emerald-950 underline ml-1"
+                      className="font-bold text-emerald-800 hover:text-emerald-950 underline ml-1 cursor-pointer"
                     >
                       Login
                     </button>
                   </p>
-                ) : (
+                ) : teacherMode === 'login' ? (
                   <p>
                     First time accessing the app?{' '}
                     <button
@@ -648,9 +973,25 @@ export const AuthScreen: React.FC = () => {
                         setTeacherMode('signup');
                         setErrorMsg('');
                       }}
-                      className="font-bold text-emerald-800 hover:text-emerald-950 underline ml-1"
+                      className="font-bold text-emerald-800 hover:text-emerald-950 underline ml-1 cursor-pointer"
                     >
                       Create Teacher Account
+                    </button>
+                  </p>
+                ) : (
+                  <p>
+                    Remembered your password?{' '}
+                    <button
+                      id="toggle-teacher-login-from-forgot-btn"
+                      type="button"
+                      onClick={() => {
+                        setTeacherMode('login');
+                        setErrorMsg('');
+                        setFoundTeacher(null);
+                      }}
+                      className="font-bold text-emerald-800 hover:text-emerald-950 underline ml-1 cursor-pointer"
+                    >
+                      Back to Login
                     </button>
                   </p>
                 )}

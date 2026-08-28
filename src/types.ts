@@ -99,6 +99,10 @@ export interface LeaveRequest {
 export interface SchoolSettings {
   schoolName: string;
   academicYear: string;
+  currentTerm?: string; // e.g. "Term 1", "Term 2", "Term 3"
+  termStartDate?: string; // YYYY-MM-DD e.g. "2026-01-13"
+  termEndDate?: string; // YYYY-MM-DD e.g. "2026-04-10"
+  termNotes?: string; // e.g. "Term 1 examinations and sports events"
   standardClockInTime: string; // "07:30"
   standardClockOutTime: string; // "15:30"
   lateGracePeriodMinutes: number; // 15
@@ -110,6 +114,7 @@ export interface SchoolSettings {
   requireLocation: boolean;
   lockMessage?: string;
   soundEffectsEnabled?: boolean;
+  phoneNotificationsEnabled?: boolean;
 }
 
 export type OfflineActionType = 'clock_in' | 'clock_out' | 'leave_request';

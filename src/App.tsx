@@ -5,7 +5,6 @@ import { SplashScreen } from './components/auth/SplashScreen';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { Header } from './components/common/Header';
 import { Navigation } from './components/common/Navigation';
-import { AndroidInstallBanner } from './components/common/AndroidInstallBanner';
 import { TeacherAiAssistant } from './components/common/TeacherAiAssistant';
 import { triggerHaptic } from './utils/haptics';
 
@@ -24,6 +23,8 @@ import { AdminAttendanceReport } from './components/admin/AdminAttendanceReport'
 import { AdminLeaveManagement } from './components/admin/AdminLeaveManagement';
 import { AdminReportsMenu } from './components/admin/AdminReportsMenu';
 import { AdminSettings } from './components/admin/AdminSettings';
+
+import { LocationGate } from './components/common/LocationGate';
 
 const MainAppContent: React.FC = () => {
   const { currentUser, isLoading, activeView, setActiveView } = useApp();
@@ -55,12 +56,7 @@ const MainAppContent: React.FC = () => {
 
   // 2. Unauthenticated -> Auth Screen (Sign up / Login)
   if (!currentUser) {
-    return (
-      <>
-        <AndroidInstallBanner />
-        <AuthScreen />
-      </>
-    );
+    return <AuthScreen />;
   }
 
   // Render view router based on user role and activeView
@@ -105,7 +101,6 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col text-slate-900 selection:bg-emerald-200">
-      <AndroidInstallBanner />
       <Header />
       <Navigation />
 
@@ -145,7 +140,9 @@ const MainAppContent: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <MainAppContent />
+      <LocationGate>
+        <MainAppContent />
+      </LocationGate>
     </AppProvider>
   );
 }

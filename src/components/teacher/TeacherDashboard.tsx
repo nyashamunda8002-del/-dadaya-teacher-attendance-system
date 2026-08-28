@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EarlyClockModal } from './EarlyClockModal';
+import { evaluateAttendanceEligibility } from '../../utils/zimbabweCalendar';
 
 export const TeacherDashboard: React.FC = () => {
   const {
@@ -36,9 +37,16 @@ export const TeacherDashboard: React.FC = () => {
     attendanceRecords,
     setActiveView,
     leaveRequests,
+    isSchoolDay,
+    isWeekend,
   } = useApp();
 
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const eligibility = evaluateAttendanceEligibility(currentTime, schoolSettings);
+  const isTodayWeekend = eligibility.statusType === 'weekend';
+  const isTodayHoliday = eligibility.statusType === 'public_holiday';
+  const isOutsideTerm = eligibility.statusType === 'outside_term';
+  const todayDayName = currentTime.toLocaleDateString('en-US', { weekday: 'long' });
   const [modalType, setModalType] = useState<'early_in' | 'early_out' | null>(null);
   const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
   const [badgeInput, setBadgeInput] = useState('');
@@ -132,6 +140,15 @@ export const TeacherDashboard: React.FC = () => {
   };
 
   const handleClockInClick = async () => {
+    // Strictly verify school days, Zimbabwe public holidays, and active term dates
+    if (!eligibility.canClock) {
+      setFeedbackMsg({
+        text: eligibility.reason,
+        type: 'error',
+      });
+      return;
+    }
+
     // Strictly verify location first
     if (!isWithinCampus) {
       const distStr = distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`;
@@ -166,6 +183,15 @@ export const TeacherDashboard: React.FC = () => {
   };
 
   const handleClockOutClick = async () => {
+    // Strictly verify school days, Zimbabwe public holidays, and active term dates
+    if (!eligibility.canClock) {
+      setFeedbackMsg({
+        text: eligibility.reason,
+        type: 'error',
+      });
+      return;
+    }
+
     // Strictly verify location first
     if (!isWithinCampus) {
       const distStr = distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`;
@@ -200,6 +226,15 @@ export const TeacherDashboard: React.FC = () => {
   };
 
   const handleConfirmEarlyAction = async (reason: string) => {
+    if (!eligibility.canClock) {
+      setFeedbackMsg({
+        text: eligibility.reason,
+        type: 'error',
+      });
+      setModalType(null);
+      return;
+    }
+
     if (!isWithinCampus) {
       setFeedbackMsg({
         text: 'Action Blocked: You are not within the Dadaya High School campus boundary.',
@@ -233,6 +268,14 @@ export const TeacherDashboard: React.FC = () => {
 
   // Badge / NFC Scan handler
   const handleBadgeScan = async (employeeIdOrEmail: string) => {
+    if (!eligibility.canClock) {
+      setFeedbackMsg({
+        text: `Badge Scan Inactive: ${eligibility.reason}`,
+        type: 'error',
+      });
+      return;
+    }
+
     if (!isWithinCampus) {
       setFeedbackMsg({
         text: 'Badge scan blocked: Device is not within Dadaya High School campus.',
@@ -420,89 +463,194 @@ export const TeacherDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Primary Thumb-Friendly Action Button */}
+        {/* Primary Action Button / Holiday, Term & Weekend Notices */}
         <div>
-          {!isWithinCampus && (
-            <div className="mb-3 p-3.5 bg-rose-50/90 border border-rose-200 rounded-2xl flex items-start gap-3 text-xs text-rose-950 shadow-2xs">
-              <div className="w-8 h-8 rounded-xl bg-rose-100 border border-rose-300 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
-                <Lock className="w-4 h-4 text-rose-700" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-extrabold text-rose-900 text-xs">
-                    Attendance Clocking Locked
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-800">
-                    {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`} away
-                  </span>
+          {isTodayHoliday ? (
+            <div className="space-y-3">
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-emerald-50 border border-amber-300 rounded-2xl flex items-start gap-3.5 text-xs shadow-2xs">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-300 text-amber-900 flex items-center justify-center shrink-0 mt-0.5 text-lg">
+                  🇿🇼
                 </div>
-                <p className="text-[11px] text-rose-800 leading-snug mt-1">
-                  {(schoolSettings.lockMessage || '')
-                    .replace(/800\s*m?/gi, `${schoolSettings.allowedRadiusMeters}m`) ||
-                    `Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the ${schoolSettings.allowedRadiusMeters}m school boundary to clock in or clock out.`}
-                </p>
-                <div className="mt-1.5 flex items-center gap-2 text-[10px] text-rose-600 font-medium">
-                  <span>• Status: Outside school perimeter</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-black text-amber-950 text-xs tracking-tight">
+                      Zimbabwe Public Holiday — {eligibility.details?.holidayName || 'National Holiday'}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-200 text-amber-900 border border-amber-300">
+                      School Closed • No Clocking
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-900 font-medium leading-snug mt-1">
+                    {eligibility.details?.greeting || 'Warm greetings to all Dadaya High School teachers on this national holiday.'}
+                  </p>
+                  <p className="text-[10px] text-emerald-800 font-bold mt-1.5 flex items-center gap-1">
+                    <span>✨ In accordance with the Zimbabwe MoPSE national calendar, faculty attendance is paused today.</span>
+                  </p>
                 </div>
               </div>
-            </div>
-          )}
 
-          {!todayRecord?.clockInTime ? (
-            <button
-              id="clock-in-btn"
-              onClick={handleClockInClick}
-              disabled={!isWithinCampus}
-              className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm tracking-wide shadow-md transition duration-150 flex items-center justify-center gap-2 uppercase ${
-                isWithinCampus
-                  ? 'bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white shadow-emerald-200 cursor-pointer'
-                  : 'bg-slate-200 border-2 border-dashed border-rose-300 text-rose-700 cursor-not-allowed shadow-none'
-              }`}
-            >
-              {isWithinCampus ? (
-                <>
-                  <Clock className="w-5 h-5" />
-                  <span>Clock In (Dadaya High)</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4 text-rose-600" />
-                  <span>Clock In Locked (Off-Campus • {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
-                </>
-              )}
-            </button>
-          ) : !todayRecord?.clockOutTime ? (
-            <button
-              id="clock-out-btn"
-              onClick={handleClockOutClick}
-              disabled={!isWithinCampus}
-              className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm tracking-wide shadow-md transition duration-150 flex items-center justify-center gap-2 uppercase ${
-                isWithinCampus
-                  ? 'bg-rose-700 hover:bg-rose-800 active:scale-[0.98] text-white shadow-rose-200 cursor-pointer'
-                  : 'bg-slate-200 border-2 border-dashed border-rose-300 text-rose-700 cursor-not-allowed shadow-none'
-              }`}
-            >
-              {isWithinCampus ? (
-                <>
-                  <Clock className="w-5 h-5" />
-                  <span>Clock Out</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4 text-rose-600" />
-                  <span>Clock Out Locked (Off-Campus • {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-center text-emerald-900 font-semibold text-xs">
-              ✓ Today's attendance complete • Duration:{' '}
-              <span className="font-mono font-bold">
-                {todayRecord.totalWorkingMinutes
-                  ? `${Math.floor(todayRecord.totalWorkingMinutes / 60)}h ${todayRecord.totalWorkingMinutes % 60}m`
-                  : 'N/A'}
-              </span>
+              <button
+                id="holiday-inactive-btn"
+                type="button"
+                disabled
+                className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs tracking-wide bg-amber-100/70 border border-amber-200 text-amber-900 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <span>🇿🇼 Attendance Paused (Public Holiday: {eligibility.details?.holidayName || 'National Holiday'})</span>
+              </button>
             </div>
+          ) : isOutsideTerm ? (
+            <div className="space-y-3">
+              <div className="p-4 bg-blue-50/90 border border-blue-200 rounded-2xl flex items-start gap-3 text-xs text-blue-950 shadow-2xs">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 border border-blue-300 text-blue-800 flex items-center justify-center shrink-0 mt-0.5">
+                  <CalendarDays className="w-5 h-5 text-blue-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-bold text-blue-950 text-xs">
+                      School Term Vacation / Break
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-200 text-blue-900 border border-blue-300">
+                      Outside Term Dates
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-blue-800 leading-snug mt-1">
+                    Attendance clocking operates strictly during active academic term dates. School is currently on vacation.
+                  </p>
+                  <p className="text-[10px] text-blue-700 font-bold mt-1">
+                    • Official Session: {schoolSettings.termStartDate} → {schoolSettings.termEndDate}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                id="term-break-inactive-btn"
+                type="button"
+                disabled
+                className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs tracking-wide bg-slate-100 border border-slate-200 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <CalendarDays className="w-4 h-4 text-slate-400" />
+                <span>Attendance Inactive (School Term Break)</span>
+              </button>
+            </div>
+          ) : isTodayWeekend ? (
+            <div className="space-y-3">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3 text-xs text-slate-800 shadow-2xs">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                  <CalendarDays className="w-5 h-5 text-amber-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-bold text-slate-900 text-xs">
+                      Weekend — School Closed
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-200">
+                      {todayDayName} (Weekend)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug mt-1">
+                    Dadaya High School attendance operates strictly on official school days (Monday to Friday, 07:00 – 16:30). The attendance clock is resting today.
+                  </p>
+                  <p className="text-[10px] text-emerald-800 font-semibold mt-1">
+                    • Next active session: Monday at 07:00 AM
+                  </p>
+                </div>
+              </div>
+
+              <button
+                id="weekend-inactive-btn"
+                type="button"
+                disabled
+                className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs tracking-wide bg-slate-100 border border-slate-200 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <CalendarDays className="w-4 h-4 text-slate-400" />
+                <span>Attendance Inactive (School Closed on Weekends)</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {!isWithinCampus && (
+                <div className="mb-3 p-3.5 bg-rose-50/90 border border-rose-200 rounded-2xl flex items-start gap-3 text-xs text-rose-950 shadow-2xs">
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 border border-rose-300 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <Lock className="w-4 h-4 text-rose-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-extrabold text-rose-900 text-xs">
+                        Attendance Clocking Locked
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/80 text-rose-800">
+                        {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(2)} km` : `${distanceMeters}m`} away
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-rose-800 leading-snug mt-1">
+                      {(schoolSettings.lockMessage || '')
+                        .replace(/800\s*m?/gi, `${schoolSettings.allowedRadiusMeters}m`) ||
+                        `Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the ${schoolSettings.allowedRadiusMeters}m school boundary to clock in or clock out.`}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-rose-600 font-medium">
+                      <span>• Status: Outside school perimeter</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!todayRecord?.clockInTime ? (
+                <button
+                  id="clock-in-btn"
+                  onClick={handleClockInClick}
+                  disabled={!isWithinCampus}
+                  className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm tracking-wide shadow-md transition duration-150 flex items-center justify-center gap-2 uppercase ${
+                    isWithinCampus
+                      ? 'bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white shadow-emerald-200 cursor-pointer'
+                      : 'bg-slate-200 border-2 border-dashed border-rose-300 text-rose-700 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  {isWithinCampus ? (
+                    <>
+                      <Clock className="w-5 h-5" />
+                      <span>Clock In (Dadaya High)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-rose-600" />
+                      <span>Clock In Locked (Off-Campus • {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
+                    </>
+                  )}
+                </button>
+              ) : !todayRecord?.clockOutTime ? (
+                <button
+                  id="clock-out-btn"
+                  onClick={handleClockOutClick}
+                  disabled={!isWithinCampus}
+                  className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm tracking-wide shadow-md transition duration-150 flex items-center justify-center gap-2 uppercase ${
+                    isWithinCampus
+                      ? 'bg-rose-700 hover:bg-rose-800 active:scale-[0.98] text-white shadow-rose-200 cursor-pointer'
+                      : 'bg-slate-200 border-2 border-dashed border-rose-300 text-rose-700 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  {isWithinCampus ? (
+                    <>
+                      <Clock className="w-5 h-5" />
+                      <span>Clock Out</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-rose-600" />
+                      <span>Clock Out Locked (Off-Campus • {distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)}km` : `${distanceMeters}m`})</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-center text-emerald-900 font-semibold text-xs">
+                  ✓ Today's attendance complete • Duration:{' '}
+                  <span className="font-mono font-bold">
+                    {todayRecord.totalWorkingMinutes
+                      ? `${Math.floor(todayRecord.totalWorkingMinutes / 60)}h ${todayRecord.totalWorkingMinutes % 60}m`
+                      : 'N/A'}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
 

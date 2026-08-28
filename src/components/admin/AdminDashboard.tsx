@@ -85,6 +85,34 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Academic Term Dates Card */}
+      <div className="bg-linear-to-r from-emerald-900/90 to-slate-900 text-white rounded-2xl p-4 border border-emerald-700/40 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-500/30">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-sm text-white">
+                {schoolSettings.currentTerm || 'Term 1'} • {schoolSettings.academicYear || '2026 Academic Year'}
+              </span>
+              <span className="bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                Active Term
+              </span>
+            </div>
+            <p className="text-xs text-emerald-200/90 mt-0.5">
+              Beginning: <strong className="text-white font-mono">{schoolSettings.termStartDate || '2026-01-13'}</strong> • Closing: <strong className="text-white font-mono">{schoolSettings.termEndDate || '2026-04-10'}</strong>
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setActiveView('settings')}
+          className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-emerald-100 border border-white/15 rounded-xl text-xs font-semibold transition shrink-0 self-start sm:self-center"
+        >
+          Configure Term Dates
+        </button>
+      </div>
+
       {/* 4 Metric Cards (Teachers, Present, Late, Absent) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         {/* Total Teachers */}

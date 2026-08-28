@@ -27,9 +27,19 @@ import {
   FileSpreadsheet,
   FileJson,
   ShieldCheck,
+  Calendar,
+  Bell,
+  Smartphone,
+  Check,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { soundEffects } from '../../utils/soundEffects';
+import {
+  sendPhoneNotification,
+  requestPhoneNotificationPermission,
+  getNotificationPermission,
+  isNotificationSupported,
+} from '../../utils/phoneNotifications';
 
 export const AdminSettings: React.FC = () => {
   const {
@@ -47,13 +57,16 @@ export const AdminSettings: React.FC = () => {
     restoreBackupData,
   } = useApp();
 
-  const [activeModal, setActiveModal] = useState<'school' | 'rules' | 'backup' | 'confirmReset' | null>(null);
+  const [activeModal, setActiveModal] = useState<'school' | 'rules' | 'backup' | 'confirmReset' | 'termDates' | 'notifications' | null>(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sound settings
+  // Sound & notification settings
   const [soundEnabled, setSoundEnabled] = useState(schoolSettings.soundEffectsEnabled ?? true);
+  const [phoneNotifsEnabled, setPhoneNotifsEnabled] = useState(schoolSettings.phoneNotificationsEnabled ?? true);
+  const [notificationPerm, setNotificationPerm] = useState<string>(getNotificationPermission());
+  const [testNotifSent, setTestNotifSent] = useState(false);
 
   // School info form
   const [schoolName, setSchoolName] = useState(schoolSettings.schoolName);
@@ -66,6 +79,12 @@ export const AdminSettings: React.FC = () => {
       'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.'
   );
 
+  // Term dates form
+  const [currentTerm, setCurrentTerm] = useState(schoolSettings.currentTerm || 'Term 1');
+  const [termStartDate, setTermStartDate] = useState(schoolSettings.termStartDate || '2026-01-13');
+  const [termEndDate, setTermEndDate] = useState(schoolSettings.termEndDate || '2026-04-10');
+  const [termNotes, setTermNotes] = useState(schoolSettings.termNotes || 'First Term 2026 - Academic & Co-curricular sessions');
+
   React.useEffect(() => {
     setSchoolName(schoolSettings.schoolName);
     setAcademicYear(schoolSettings.academicYear);
@@ -77,6 +96,12 @@ export const AdminSettings: React.FC = () => {
         'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.'
     );
     setSoundEnabled(schoolSettings.soundEffectsEnabled ?? true);
+    setPhoneNotifsEnabled(schoolSettings.phoneNotificationsEnabled ?? true);
+    setCurrentTerm(schoolSettings.currentTerm || 'Term 1');
+    setTermStartDate(schoolSettings.termStartDate || '2026-01-13');
+    setTermEndDate(schoolSettings.termEndDate || '2026-04-10');
+    setTermNotes(schoolSettings.termNotes || 'First Term 2026 - Academic & Co-curricular sessions');
+    setNotificationPerm(getNotificationPermission());
   }, [schoolSettings]);
 
   // Attendance rules form
@@ -103,6 +128,39 @@ export const AdminSettings: React.FC = () => {
       setSaveSuccess(false);
       setActiveModal(null);
     }, 1500);
+  };
+
+  const handleSaveTermDates = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSchoolSettings({
+      currentTerm: currentTerm.trim(),
+      termStartDate,
+      termEndDate,
+      termNotes: termNotes.trim(),
+      academicYear: academicYear.trim(),
+    });
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      setActiveModal(null);
+    }, 1200);
+  };
+
+  const handleRequestPhonePermission = async () => {
+    const res = await requestPhoneNotificationPermission();
+    setNotificationPerm(res.permission);
+  };
+
+  const handleSendTestNotification = async () => {
+    const success = await sendPhoneNotification({
+      title: 'Dadaya High School Attendance',
+      body: `Test phone notification alert dispatched successfully at ${new Date().toLocaleTimeString()}!`,
+      tag: 'test-notification',
+    });
+    if (success) {
+      setTestNotifSent(true);
+      setTimeout(() => setTestNotifSent(false), 3000);
+    }
   };
 
   const handleSaveRules = (e: React.FormEvent) => {
@@ -168,10 +226,43 @@ export const AdminSettings: React.FC = () => {
     }
   };
 
+  const handleTogglePhoneNotifs = (enabled: boolean) => {
+    setPhoneNotifsEnabled(enabled);
+    updateSchoolSettings({ phoneNotificationsEnabled: enabled });
+    if (enabled && notificationPerm !== 'granted') {
+      handleRequestPhonePermission();
+    }
+  };
+
+  // Calculate term progress
+  const startTs = new Date(schoolSettings.termStartDate || '2026-01-13').getTime();
+  const endTs = new Date(schoolSettings.termEndDate || '2026-04-10').getTime();
+  const nowTs = Date.now();
+  const totalTermDays = Math.max(1, Math.round((endTs - startTs) / (1000 * 60 * 60 * 24)));
+  const elapsedTermDays = Math.max(0, Math.min(totalTermDays, Math.round((nowTs - startTs) / (1000 * 60 * 60 * 24))));
+  const remainingTermDays = Math.max(0, Math.round((endTs - nowTs) / (1000 * 60 * 60 * 24)));
+  const termPercent = Math.min(100, Math.max(0, Math.round((elapsedTermDays / totalTermDays) * 100)));
+
   const menuItems = [
     {
+      id: 'termDates',
+      title: 'Academic Term & Calendar',
+      desc: `Configure ${schoolSettings.currentTerm || 'Term 1'} start (${schoolSettings.termStartDate || '13 Jan'}) & closing dates (${schoolSettings.termEndDate || '10 Apr'})`,
+      icon: Calendar,
+      badge: `${remainingTermDays} Days Left`,
+      action: () => setActiveModal('termDates'),
+    },
+    {
+      id: 'notifications',
+      title: 'Phone Push Notifications',
+      desc: 'Instant device lockscreen & banner alerts for clock-ins, clock-outs and leaves',
+      icon: Smartphone,
+      badge: notificationPerm === 'granted' ? 'Active' : 'Setup Required',
+      action: () => setActiveModal('notifications'),
+    },
+    {
       id: 'school',
-      title: 'School Information',
+      title: 'School Information & Campus GPS',
       desc: 'View and update institution name, GPS coordinates and academic year',
       icon: School,
       action: () => setActiveModal('school'),
@@ -179,7 +270,7 @@ export const AdminSettings: React.FC = () => {
     {
       id: 'teachers',
       title: 'Manage Teachers',
-      desc: 'Add, edit or remove teaching faculty members',
+      desc: 'Add, edit or remove teaching faculty members & EC numbers',
       icon: Users,
       action: () => setActiveView('teachers'),
     },
@@ -193,14 +284,14 @@ export const AdminSettings: React.FC = () => {
     },
     {
       id: 'rules',
-      title: 'Attendance Rules',
-      desc: 'Configure standard hours, late threshold & early notices',
+      title: 'Attendance Rules & Timetable',
+      desc: 'Configure standard hours, late threshold (07:45) & early notices',
       icon: Clock,
       action: () => setActiveModal('rules'),
     },
     {
       id: 'backup',
-      title: 'Backup & Restore',
+      title: 'Backup & Restore Database',
       desc: 'Export complete database logs and configurations',
       icon: Database,
       action: () => setActiveModal('backup'),
@@ -213,8 +304,119 @@ export const AdminSettings: React.FC = () => {
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
         <h2 className="text-xl font-bold text-gray-900">Admin Settings</h2>
         <p className="text-xs text-gray-500 mt-0.5">
-          System policies, institution preferences, and account maintenance for {schoolSettings.schoolName}
+          System policies, academic calendar terms, notifications and institutional preferences for {schoolSettings.schoolName}
         </p>
+      </div>
+
+      {/* Academic Term Progress Banner Card */}
+      <div className="bg-linear-to-br from-blue-900 via-slate-900 to-emerald-950 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-slate-700/60 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 text-emerald-400 border border-white/10 flex items-center justify-center shrink-0">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-white text-base">
+                  {schoolSettings.currentTerm || 'Term 1'} • {schoolSettings.academicYear || '2026 Academic Year'}
+                </h3>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Official Term Period
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Beginning: <strong className="text-white font-mono">{schoolSettings.termStartDate || '2026-01-13'}</strong> • Closing/Ending: <strong className="text-white font-mono">{schoolSettings.termEndDate || '2026-04-10'}</strong>
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveModal('termDates')}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition inline-flex items-center gap-1.5 shrink-0 self-start sm:self-center"
+          >
+            <Calendar className="w-3.5 h-3.5" /> Edit Term Dates
+          </button>
+        </div>
+
+        {/* Term Completion Progress Bar */}
+        <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-300">
+            <span>Term Progress ({elapsedTermDays} of {totalTermDays} calendar days)</span>
+            <span className="font-bold text-emerald-400">{termPercent}% Elapsed • {remainingTermDays} Days Remaining</span>
+          </div>
+          <div className="w-full h-2.5 bg-slate-800/80 rounded-full overflow-hidden border border-white/10">
+            <div
+              className="h-full bg-linear-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+              style={{ width: `${termPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Phone Push Notifications Management Card */}
+      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${notificationPerm === 'granted' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-sm">Direct Phone Push Notifications</h3>
+                {notificationPerm === 'granted' ? (
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full inline-flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Enabled on Device
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full">
+                    Permission Needed
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                Delivers instant phone drawer alerts for teacher clock-ins, late arrivals, departures, and leave applications
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {notificationPerm !== 'granted' && (
+              <button
+                onClick={handleRequestPhonePermission}
+                className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
+              >
+                Allow Phone Alerts
+              </button>
+            )}
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={phoneNotifsEnabled}
+                onChange={(e) => handleTogglePhoneNotifs(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-700"></div>
+            </label>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2 text-xs">
+          <span className="text-gray-500 text-[11px]">
+            Test your phone notification tray integration:
+          </span>
+          <button
+            onClick={handleSendTestNotification}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition ${
+              testNotifSent
+                ? 'bg-emerald-100 text-emerald-800'
+                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            {testNotifSent ? 'Notification Sent to Phone!' : 'Send Test Phone Alert'}
+          </button>
+        </div>
       </div>
 
       {/* Firebase Cloud Sync Status Card */}
@@ -352,6 +554,233 @@ export const AdminSettings: React.FC = () => {
           <span>Created by <strong className="text-emerald-800 font-bold">Nyasha Munda</strong></span>
         </div>
       </div>
+
+      {/* Academic Term Dates Modal */}
+      <AnimatePresence>
+        {activeModal === 'termDates' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden p-6"
+            >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Academic Term Dates</h3>
+                    <p className="text-[11px] text-gray-500">Configure official term start and closing dates</p>
+                  </div>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {saveSuccess && (
+                <div className="mb-4 p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Academic term dates successfully updated and saved!</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveTermDates} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">Active Term Selection</label>
+                  <select
+                    value={currentTerm}
+                    onChange={(e) => setCurrentTerm(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-semibold text-slate-800"
+                  >
+                    <option value="Term 1">Term 1 (First Term)</option>
+                    <option value="Term 2">Term 2 (Second Term)</option>
+                    <option value="Term 3">Term 3 (Third Term)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">
+                      Term Beginning Date <span className="text-emerald-700 font-bold">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={termStartDate}
+                      onChange={(e) => setTermStartDate(e.target.value)}
+                      required
+                      className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-0.5">School reopens / starts</p>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">
+                      Term Ending Date <span className="text-rose-600 font-bold">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={termEndDate}
+                      onChange={(e) => setTermEndDate(e.target.value)}
+                      required
+                      className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs font-semibold"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-0.5">School closes / vacation</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">Academic Year</label>
+                  <input
+                    type="text"
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    placeholder="e.g. 2026 Academic Year"
+                    className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">Term Description & Remarks</label>
+                  <textarea
+                    rows={2}
+                    value={termNotes}
+                    onChange={(e) => setTermNotes(e.target.value)}
+                    placeholder="e.g. First Term 2026 - Academic lectures, sports & examinations"
+                    className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs"
+                  />
+                </div>
+
+                {/* Calculation summary */}
+                <div className="p-3 bg-emerald-50/80 border border-emerald-200/80 rounded-xl text-emerald-900 text-xs flex items-center justify-between">
+                  <div>
+                    <span className="font-bold block">Calendar Duration</span>
+                    <span className="text-[11px] text-emerald-700">{termStartDate} to {termEndDate}</span>
+                  </div>
+                  <span className="font-mono font-bold text-xs bg-emerald-100 text-emerald-900 px-2 py-1 rounded-lg">
+                    {Math.max(1, Math.round((new Date(termEndDate).getTime() - new Date(termStartDate).getTime()) / (1000 * 60 * 60 * 24)))} Days
+                  </span>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal(null)}
+                    className="px-4 py-2 text-gray-600 font-semibold rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow-xs inline-flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" /> Save Term Dates
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Phone Notifications Setup Modal */}
+      <AnimatePresence>
+        {activeModal === 'notifications' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Phone Push Notifications</h3>
+                    <p className="text-[11px] text-gray-500">Android device and browser notification alerts</p>
+                  </div>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-600">
+                <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-indigo-950">Permission Status</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                      notificationPerm === 'granted'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : notificationPerm === 'denied'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {notificationPerm.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-indigo-800">
+                    When active, your phone vibrates and shows immediate notifications on your lock screen and notification shade when attendance actions take place.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <h4 className="font-bold text-slate-900 text-xs">Supported Alert Events:</h4>
+                  <ul className="space-y-1.5 text-[11px] text-slate-600">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span><strong>Teacher Clock-In:</strong> Instant notification when faculty check in on campus</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span><strong>Late Arrivals & Early Notices:</strong> Alerts for after 07:45 or early departure requests</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      <span><strong>Teacher Clock-Out:</strong> Shift completion and duty hours summary</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      <span><strong>Leave Applications:</strong> Submissions and review approval status</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  {notificationPerm !== 'granted' ? (
+                    <button
+                      onClick={handleRequestPhonePermission}
+                      className="w-full py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-xl shadow-xs transition text-center"
+                    >
+                      Enable Phone Notifications Now
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSendTestNotification}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition text-center inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Bell className="w-4 h-4" />
+                      {testNotifSent ? 'Test Notification Sent to Phone!' : 'Send Test Notification'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal(null)}
+                    className="w-full py-2 text-gray-500 hover:text-gray-700 font-semibold rounded-xl text-center"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* School Info Modal */}
       <AnimatePresence>

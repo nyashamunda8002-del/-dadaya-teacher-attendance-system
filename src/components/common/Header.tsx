@@ -14,7 +14,6 @@ import {
   X,
   Building2,
   Calendar,
-  ArrowDownToLine,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from './SchoolCrest';
@@ -177,18 +176,6 @@ export const Header: React.FC = () => {
                 )}
               </div>
             )}
-
-            {/* Direct App Download Link for Phone */}
-            <a
-              href="/api/download-app"
-              download="DadayaAttendance-v1.0.4.apk"
-              onClick={() => triggerHaptic('medium')}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition select-none"
-              title="Download Android App Package to Phone"
-            >
-              <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-700" />
-              <span className="hidden sm:inline">Download App</span>
-            </a>
 
             {/* Logout Icon */}
             <button
