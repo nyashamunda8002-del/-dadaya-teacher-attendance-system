@@ -40,22 +40,21 @@ export const NotificationPermissionModal: React.FC = () => {
         return;
       }
 
-      // If permission is 'default' (never asked or user hasn't decided)
+      // If permission is 'default' (needs permission)
       if (currentPerm === 'default') {
         const lastDismissed = localStorage.getItem(PROMPT_DISMISSED_KEY);
-        // If dismissed recently (e.g. within 2 hours), don't harass unless they logged in now
         if (lastDismissed) {
           const dismissedTime = parseInt(lastDismissed, 10);
-          const twoHours = 2 * 60 * 60 * 1000;
-          if (Date.now() - dismissedTime < twoHours && !currentUser) {
+          const oneHour = 60 * 60 * 1000;
+          if (Date.now() - dismissedTime < oneHour) {
             return;
           }
         }
 
-        // Show prompt after a short 1-second delay so user sees dashboard context
+        // Show prompt shortly after app load
         const timer = setTimeout(() => {
           setIsOpen(true);
-        }, 1000);
+        }, 600);
 
         return () => clearTimeout(timer);
       }

@@ -93,6 +93,29 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "schoolName", "schoolLatitude", "schoolLongitude"]
+    },
+    "backups": {
+      "title": "Database Cloud Backup Snapshot",
+      "description": "Automated and scheduled system snapshots stored in Cloud Firestore",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "backupName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["scheduled", "manual"] },
+        "scheduleFrequency": { "type": "string" },
+        "status": { "type": "string", "enum": ["completed", "in_progress", "failed"] },
+        "recordsCount": { "type": "number" },
+        "teachersCount": { "type": "number" },
+        "leaveCount": { "type": "number" },
+        "notificationsCount": { "type": "number" },
+        "triggeredBy": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "term": { "type": "string" },
+        "data": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "backupName", "timestamp", "type", "status"]
     }
   },
   "firestore": {
@@ -111,6 +134,10 @@
     "school_settings": {
       "collection": "school_settings",
       "description": "School global settings document"
+    },
+    "backups": {
+      "collection": "backups",
+      "description": "Collection of scheduled and manual database backup snapshots"
     }
   }
 }

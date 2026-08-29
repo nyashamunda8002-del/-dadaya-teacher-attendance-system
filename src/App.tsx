@@ -5,7 +5,6 @@ import { SplashScreen } from './components/auth/SplashScreen';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { Header } from './components/common/Header';
 import { Navigation } from './components/common/Navigation';
-import { TeacherAiAssistant } from './components/common/TeacherAiAssistant';
 import { triggerHaptic } from './utils/haptics';
 
 // Teacher Views
@@ -25,8 +24,6 @@ import { AdminReportsMenu } from './components/admin/AdminReportsMenu';
 import { AdminSettings } from './components/admin/AdminSettings';
 
 import { LocationGate } from './components/common/LocationGate';
-
-import { PhoneNotificationBanner } from './components/common/PhoneNotificationBanner';
 import { NotificationPermissionModal } from './components/common/NotificationPermissionModal';
 
 const MainAppContent: React.FC = () => {
@@ -107,9 +104,8 @@ const MainAppContent: React.FC = () => {
       <Header />
       <Navigation />
 
-      {/* Main Content Area - Optimized for mobile touch & desktop readability */}
+      {/* Main Content Area - Clean, focused layout */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6 pb-24 md:pb-12">
-        <PhoneNotificationBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={activeView + '-' + currentUser.role}
@@ -122,9 +118,6 @@ const MainAppContent: React.FC = () => {
           </motion.div>
         </AnimatePresence>
       </main>
-
-      {/* Floating AI Navigation Assistant for Teachers & Staff */}
-      <TeacherAiAssistant />
 
       {/* Global Desktop Footer */}
       <footer className="hidden md:block bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
