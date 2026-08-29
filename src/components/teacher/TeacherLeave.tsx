@@ -13,9 +13,11 @@ import {
   Building2,
   Trash2,
   Filter,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { LeaveType, LeaveRequest } from '../../types';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const TeacherLeave: React.FC = () => {
   const { currentUser, leaveRequests, submitLeaveRequest, deleteLeaveRequest } = useApp();
@@ -351,12 +353,48 @@ export const TeacherLeave: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Reason / Justification</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-gray-700">Reason / Justification</label>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        triggerHaptic('light');
+                        try {
+                          const res = await fetch('/api/ai/draft-leave-reason', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              leaveType,
+                              teacherName: currentUser?.name || 'Teacher',
+                              subject: currentUser?.subject || 'Academic Department',
+                              dates: `${startDate} to ${endDate}`,
+                              notes: reason,
+                            }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            if (data.draftReason) {
+                              setReason(data.draftReason);
+                            }
+                            if (data.handoverSuggestion && !handoverDetails) {
+                              setHandoverDetails(data.handoverSuggestion);
+                            }
+                          }
+                        } catch (e) {
+                          console.warn('AI draft failed:', e);
+                        }
+                      }}
+                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      <span>AI Smart Draft</span>
+                    </button>
+                  </div>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     required
-                    placeholder="Provide specific details regarding the leave request..."
+                    placeholder="Provide specific details or tap 'AI Smart Draft'..."
                     rows={3}
                     className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs resize-none"
                   />

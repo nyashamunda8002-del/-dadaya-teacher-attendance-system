@@ -21,10 +21,15 @@ import {
   CalendarDays,
   ChevronRight,
   UserCheck,
+  WifiOff,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EarlyClockModal } from './EarlyClockModal';
 import { evaluateAttendanceEligibility } from '../../utils/zimbabweCalendar';
+import {
+  getNotificationPermission,
+  requestPhoneNotificationPermission,
+} from '../../utils/phoneNotifications';
 
 export const TeacherDashboard: React.FC = () => {
   const {
@@ -39,8 +44,10 @@ export const TeacherDashboard: React.FC = () => {
     leaveRequests,
     isSchoolDay,
     isWeekend,
+    isOnline,
   } = useApp();
 
+  const isOffline = !isOnline || (typeof navigator !== 'undefined' && !navigator.onLine);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const eligibility = evaluateAttendanceEligibility(currentTime, schoolSettings);
   const isTodayWeekend = eligibility.statusType === 'weekend';
@@ -140,6 +147,15 @@ export const TeacherDashboard: React.FC = () => {
   };
 
   const handleClockInClick = async () => {
+    // Strictly enforce: Offline clocking prohibited
+    if (isOffline) {
+      setFeedbackMsg({
+        text: 'Offline Clocking Prohibited: An active internet connection is required to record and verify attendance with Dadaya High School Cloud servers.',
+        type: 'error',
+      });
+      return;
+    }
+
     // Strictly verify school days, Zimbabwe public holidays, and active term dates
     if (!eligibility.canClock) {
       setFeedbackMsg({
@@ -179,10 +195,25 @@ export const TeacherDashboard: React.FC = () => {
         text: res.message,
         type: res.success ? 'success' : 'error',
       });
+
+      if (res.success && getNotificationPermission() === 'default') {
+        setTimeout(() => {
+          requestPhoneNotificationPermission().catch(() => {});
+        }, 1200);
+      }
     }
   };
 
   const handleClockOutClick = async () => {
+    // Strictly enforce: Offline clocking prohibited
+    if (isOffline) {
+      setFeedbackMsg({
+        text: 'Offline Clocking Prohibited: An active internet connection is required to record and verify attendance with Dadaya High School Cloud servers.',
+        type: 'error',
+      });
+      return;
+    }
+
     // Strictly verify school days, Zimbabwe public holidays, and active term dates
     if (!eligibility.canClock) {
       setFeedbackMsg({
@@ -222,10 +253,25 @@ export const TeacherDashboard: React.FC = () => {
         text: res.message,
         type: res.success ? 'success' : 'error',
       });
+
+      if (res.success && getNotificationPermission() === 'default') {
+        setTimeout(() => {
+          requestPhoneNotificationPermission().catch(() => {});
+        }, 1200);
+      }
     }
   };
 
   const handleConfirmEarlyAction = async (reason: string) => {
+    if (isOffline) {
+      setFeedbackMsg({
+        text: 'Offline Action Prohibited: An active internet connection is required.',
+        type: 'error',
+      });
+      setModalType(null);
+      return;
+    }
+
     if (!eligibility.canClock) {
       setFeedbackMsg({
         text: eligibility.reason,
@@ -268,6 +314,14 @@ export const TeacherDashboard: React.FC = () => {
 
   // Badge / NFC Scan handler
   const handleBadgeScan = async (employeeIdOrEmail: string) => {
+    if (isOffline) {
+      setFeedbackMsg({
+        text: 'Offline Clocking Prohibited: An active internet connection is required for badge scanning.',
+        type: 'error',
+      });
+      return;
+    }
+
     if (!eligibility.canClock) {
       setFeedbackMsg({
         text: `Badge Scan Inactive: ${eligibility.reason}`,
@@ -568,7 +622,26 @@ export const TeacherDashboard: React.FC = () => {
             </div>
           ) : (
             <>
-              {!isWithinCampus && (
+              {isOffline ? (
+                <div className="mb-3 p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3 text-xs text-amber-950 shadow-2xs">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <WifiOff className="w-4 h-4 text-amber-800" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-extrabold text-amber-950 text-xs">
+                        Internet Connection Required
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                        Offline Clocking Prohibited
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-900 leading-snug mt-1">
+                      Dadaya High School attendance policies strictly require real-time cloud server verification. Offline clocking is disabled. Please connect to the internet to clock attendance.
+                    </p>
+                  </div>
+                </div>
+              ) : !isWithinCampus ? (
                 <div className="mb-3 p-3.5 bg-rose-50/90 border border-rose-200 rounded-2xl flex items-start gap-3 text-xs text-rose-950 shadow-2xs">
                   <div className="w-8 h-8 rounded-xl bg-rose-100 border border-rose-300 text-rose-700 flex items-center justify-center shrink-0 mt-0.5">
                     <Lock className="w-4 h-4 text-rose-700" />
@@ -592,20 +665,25 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {!todayRecord?.clockInTime ? (
                 <button
                   id="clock-in-btn"
                   onClick={handleClockInClick}
-                  disabled={!isWithinCampus}
+                  disabled={!isWithinCampus || isOffline}
                   className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm tracking-wide shadow-md transition duration-150 flex items-center justify-center gap-2 uppercase ${
-                    isWithinCampus
+                    isWithinCampus && !isOffline
                       ? 'bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white shadow-emerald-200 cursor-pointer'
                       : 'bg-slate-200 border-2 border-dashed border-rose-300 text-rose-700 cursor-not-allowed shadow-none'
                   }`}
                 >
-                  {isWithinCampus ? (
+                  {isOffline ? (
+                    <>
+                      <WifiOff className="w-4 h-4 text-amber-700" />
+                      <span>Clock In Locked (Offline - Connection Required)</span>
+                    </>
+                  ) : isWithinCampus ? (
                     <>
                       <Clock className="w-5 h-5" />
                       <span>Clock In (Dadaya High)</span>
@@ -621,14 +699,19 @@ export const TeacherDashboard: React.FC = () => {
                 <button
                   id="clock-out-btn"
                   onClick={handleClockOutClick}
-                  disabled={!isWithinCampus}
+                  disabled={!isWithinCampus || isOffline}
                   className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm tracking-wide shadow-md transition duration-150 flex items-center justify-center gap-2 uppercase ${
-                    isWithinCampus
+                    isWithinCampus && !isOffline
                       ? 'bg-rose-700 hover:bg-rose-800 active:scale-[0.98] text-white shadow-rose-200 cursor-pointer'
                       : 'bg-slate-200 border-2 border-dashed border-rose-300 text-rose-700 cursor-not-allowed shadow-none'
                   }`}
                 >
-                  {isWithinCampus ? (
+                  {isOffline ? (
+                    <>
+                      <WifiOff className="w-4 h-4 text-amber-700" />
+                      <span>Clock Out Locked (Offline - Connection Required)</span>
+                    </>
+                  ) : isWithinCampus ? (
                     <>
                       <Clock className="w-5 h-5" />
                       <span>Clock Out</span>
@@ -658,8 +741,15 @@ export const TeacherDashboard: React.FC = () => {
         <button
           id="badge-scan-trigger-btn"
           type="button"
-          disabled={!isWithinCampus}
+          disabled={!isWithinCampus || isOffline}
           onClick={() => {
+            if (isOffline) {
+              setFeedbackMsg({
+                text: 'Badge Clocking Locked: An active internet connection is required to scan staff ID.',
+                type: 'error',
+              });
+              return;
+            }
             if (!isWithinCampus) {
               setFeedbackMsg({
                 text: 'Badge Clocking Locked: You must be on Dadaya High School campus to scan your staff ID.',
@@ -670,18 +760,26 @@ export const TeacherDashboard: React.FC = () => {
             setIsBadgeModalOpen(true);
           }}
           className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs transition flex items-center justify-center gap-2 ${
-            isWithinCampus
+            isWithinCampus && !isOffline
               ? 'border-purple-200 bg-purple-50/70 hover:bg-purple-100 text-purple-900 cursor-pointer'
               : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
           }`}
         >
-          {isWithinCampus ? (
+          {isOffline ? (
+            <WifiOff className="w-4 h-4 text-slate-400" />
+          ) : isWithinCampus ? (
             <CreditCard className="w-4 h-4 text-purple-700" />
           ) : (
             <Lock className="w-4 h-4 text-slate-400" />
           )}
-          <span>{isWithinCampus ? 'Tap Staff ID / NFC Badge' : 'Staff ID / Badge Tap (Locked Off-Campus)'}</span>
-          {isWithinCampus && (
+          <span>
+            {isOffline
+              ? 'Staff ID / Badge (Locked Offline)'
+              : isWithinCampus
+              ? 'Tap Staff ID / NFC Badge'
+              : 'Staff ID / Badge Tap (Locked Off-Campus)'}
+          </span>
+          {isWithinCampus && !isOffline && (
             <span className="px-1.5 py-0.2 rounded-md text-[9px] bg-purple-200 text-purple-900 uppercase font-black">
               Instant
             </span>
@@ -765,6 +863,29 @@ export const TeacherDashboard: React.FC = () => {
           <p className="text-xl font-black font-mono text-teal-800 mt-0.5">{totalHoursFormatted}</p>
           <span className="text-[9px] text-gray-400">Total Hours</span>
         </div>
+      </div>
+
+      {/* Attendance Overview Banner Card */}
+      <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-gray-900">Attendance Overview</h3>
+            <p className="text-[11px] text-gray-500">
+              Monthly records, punctuality score & time sheets
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setActiveView('attendance')}
+          className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-900 text-xs font-bold rounded-xl transition inline-flex items-center gap-1 shrink-0"
+        >
+          <span>View</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Leave & Absence Banner Card */}

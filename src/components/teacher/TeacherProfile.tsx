@@ -383,6 +383,73 @@ export const TeacherProfile: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Notification Settings Modal */}
+      <AnimatePresence>
+        {activeModal === 'notifications' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden p-6"
+            >
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Phone Notifications</h3>
+                    <p className="text-[10px] text-gray-500">Alerts delivered directly to your device</p>
+                  </div>
+                </div>
+                <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                  <div className="font-bold text-emerald-950 flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Direct Phone Notification Engine</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 mt-1">
+                    Notifications are sent to your lock screen and notification shade for duty reminders (07:15 AM), late arrivals, clock-outs (16:30 PM), leave status changes, and Zimbabwe national holidays.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800">Test Phone Notification</div>
+                    <div className="text-[10px] text-slate-500">Send an instant alert with vibration to your phone</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      triggerHaptic('medium');
+                      const { sendTestPhoneNotification } = await import('../../utils/phoneNotifications');
+                      await sendTestPhoneNotification();
+                    }}
+                    className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold rounded-xl transition cursor-pointer text-[11px]"
+                  >
+                    Send Test
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="px-5 py-2 bg-emerald-800 text-white font-bold rounded-xl text-xs"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* About App Modal */}
       <AnimatePresence>
         {activeModal === 'about' && (

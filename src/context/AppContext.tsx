@@ -47,6 +47,7 @@ interface AppContextType {
     subject: string;
     email: string;
     password?: string;
+    ecNumber?: string;
   }) => Promise<{ success: boolean; error?: string }>;
   registerAdmin: (data: {
     name: string;
@@ -77,7 +78,10 @@ interface AppContextType {
     isEarly?: boolean,
     coords?: { latitude: number; longitude: number }
   ) => Promise<{ success: boolean; message: string; distance?: number; isOfflineQueued?: boolean }>;
-  clockInWithBadge: (badgeOrEmail: string) => Promise<{ success: boolean; message: string; user?: User }>;
+  clockInWithBadge: (
+    badgeOrEmail: string,
+    coords?: { latitude: number; longitude: number }
+  ) => Promise<{ success: boolean; message: string; user?: User }>;
   submitLeaveRequest: (
     data: Omit<LeaveRequest, 'id' | 'status' | 'submittedAt'>
   ) => Promise<{ success: boolean; error?: string }>;
@@ -313,11 +317,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Background notification service initialization (public holiday greetings & reminders)
   useEffect(() => {
-    const cleanup = initializeBackgroundNotificationService();
+    const cleanup = initializeBackgroundNotificationService(() => {
+      const today = getTodayDateStr();
+      const rec = attendanceRecords.find((r) => r.userId === currentUser?.id && r.date === today);
+      const clockedIn = !!rec?.clockInTime;
+      const clockedOut = !!rec?.clockOutTime;
+      return {
+        isLoggedIn: !!currentUser,
+        userRole: currentUser?.role,
+        todayClockedIn: clockedIn,
+        todayClockedOut: clockedOut,
+        isSchoolDay: isSchoolDay(new Date()),
+      };
+    });
     return () => {
       cleanup();
     };
-  }, []);
+  }, [currentUser, attendanceRecords]);
 
   // Live real-time Firestore synchronization & backend loading
   useEffect(() => {
@@ -383,6 +399,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: docSnap.id,
               ...docSnap.data(),
             } as EarlyClockNotification));
+
+            // Cross-device push alert: If admin and a new unacknowledged teacher alert arrived in the last 2 minutes
+            if (currentUser?.role === 'admin') {
+              const nowTs = Date.now();
+              snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                  const data = change.doc.data() as EarlyClockNotification;
+                  if (data && !data.acknowledgedByAdmin && data.timestamp && (nowTs - data.timestamp < 120000)) {
+                    sendPhoneNotification({
+                      title: data.type === 'early_out' ? '⏱️ Teacher Early Departure' : '⚠️ Teacher Notice',
+                      body: `${data.teacherName} ${data.teacherSurname}: ${data.reason}`,
+                      tag: `admin-notif-${data.id}`,
+                    });
+                  }
+                }
+              });
+            }
+
             setNotifications(firestoreNotifs);
           }
         },
@@ -427,6 +461,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: docSnap.id,
               ...docSnap.data(),
             } as LeaveRequest));
+
+            // Cross-device push alert: If teacher and their leave status was reviewed
+            if (currentUser?.role === 'teacher') {
+              snapshot.docChanges().forEach((change) => {
+                if (change.type === 'modified') {
+                  const data = change.doc.data() as LeaveRequest;
+                  if (data && data.userId === currentUser.id && (data.status === 'approved' || data.status === 'rejected')) {
+                    sendPhoneNotification({
+                      title: data.status === 'approved' ? '✅ Leave Application Approved' : '❌ Leave Application Declined',
+                      body: `Your ${data.leaveType.toUpperCase()} leave request (${data.startDate} to ${data.endDate}) was ${data.status} by Administration.`,
+                      tag: `teacher-leave-${data.id}`,
+                    });
+                  }
+                }
+              });
+            }
+
             setLeaveRequests(firestoreLeaves);
           }
         },
@@ -1122,6 +1173,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const timeStr = formatCurrentTime();
     const now = new Date();
 
+    // Strictly enforce: App must NOT allow offline clocking
+    const isCurrentlyOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !isOnline;
+    if (isCurrentlyOffline) {
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playErrorBeep();
+      }
+      return {
+        success: false,
+        message: 'Offline Clocking Prohibited: An active internet connection is required to verify and record attendance with Dadaya High School Cloud servers.',
+      };
+    }
+
     // Strictly enforce Zimbabwe MoPSE School Terms, Public Holidays, and School Days (Mon-Fri)
     const eligibility = evaluateAttendanceEligibility(now, schoolSettings);
     if (!eligibility.canClock) {
@@ -1227,55 +1290,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setNotifications((prev) => [newNotification, ...prev]);
 
-    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-
-    if (isCurrentlyOffline) {
-      const queueItem: QueuedOfflineAction = {
-        id: 'q_in_' + Date.now(),
-        type: 'clock_in',
-        timestamp: Date.now(),
-        dateStr,
-        timeStr,
-        teacherId: currentUser.id,
-        teacherName: currentUser.name,
-        teacherSurname: currentUser.surname,
-        subject: currentUser.subject,
-        payload: { record: newRecord, notification: newNotification },
-        status: 'pending',
-      };
-      setOfflineQueue((prev) => [...prev, queueItem]);
-
-      if (schoolSettings.soundEffectsEnabled !== false) {
-        soundEffects.playClockInSuccess();
-      }
-
-      return {
-        success: true,
-        isOfflineQueued: true,
-        distance: distanceToSchool,
-        message: `Offline Check-in Saved: Logged on device. It will automatically sync to Dadaya Cloud when internet connects.`,
-      };
-    }
-
     // Save to Firebase Firestore
     try {
       await setDoc(doc(db, 'attendance', recordId), newRecord);
     } catch (firebaseErr) {
-      console.warn('Firebase attendance save error, queueing offline:', firebaseErr);
-      const queueItem: QueuedOfflineAction = {
-        id: 'q_in_' + Date.now(),
-        type: 'clock_in',
-        timestamp: Date.now(),
-        dateStr,
-        timeStr,
-        teacherId: currentUser.id,
-        teacherName: currentUser.name,
-        teacherSurname: currentUser.surname,
-        subject: currentUser.subject,
-        payload: { record: newRecord, notification: newNotification },
-        status: 'pending',
-      };
-      setOfflineQueue((prev) => [...prev, queueItem]);
+      console.warn('Firebase attendance save error:', firebaseErr);
     }
 
     // Save to backend database
@@ -1346,6 +1365,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const dateStr = getTodayDateStr();
     const timeStr = formatCurrentTime();
     const now = new Date();
+
+    // Strictly enforce: App must NOT allow offline clocking
+    const isCurrentlyOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !isOnline;
+    if (isCurrentlyOffline) {
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playErrorBeep();
+      }
+      return {
+        success: false,
+        message: 'Offline Clocking Prohibited: An active internet connection is required to verify and record attendance with Dadaya High School Cloud servers.',
+      };
+    }
 
     // Strictly enforce Zimbabwe MoPSE School Terms, Public Holidays, and School Days (Mon-Fri)
     const eligibility = evaluateAttendanceEligibility(now, schoolSettings);
@@ -1439,55 +1470,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setNotifications((prev) => [newNotification, ...prev]);
 
-    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-
-    if (isCurrentlyOffline) {
-      const queueItem: QueuedOfflineAction = {
-        id: 'q_out_' + Date.now(),
-        type: 'clock_out',
-        timestamp: Date.now(),
-        dateStr,
-        timeStr,
-        teacherId: currentUser.id,
-        teacherName: currentUser.name,
-        teacherSurname: currentUser.surname,
-        subject: currentUser.subject,
-        payload: { record: updatedRecord, notification: newNotification },
-        status: 'pending',
-      };
-      setOfflineQueue((prev) => [...prev, queueItem]);
-
-      if (schoolSettings.soundEffectsEnabled !== false) {
-        soundEffects.playClockOutSuccess();
-      }
-
-      return {
-        success: true,
-        isOfflineQueued: true,
-        distance: distanceToSchool,
-        message: `Offline Clock-Out Saved: Logged on device. It will automatically sync to Dadaya Cloud when internet connects.`,
-      };
-    }
-
     // Save to Firebase Firestore
     try {
       await setDoc(doc(db, 'attendance', todayRecord.id), updatedRecord);
     } catch (firebaseErr) {
-      console.warn('Firebase attendance clockout error, queueing offline:', firebaseErr);
-      const queueItem: QueuedOfflineAction = {
-        id: 'q_out_' + Date.now(),
-        type: 'clock_out',
-        timestamp: Date.now(),
-        dateStr,
-        timeStr,
-        teacherId: currentUser.id,
-        teacherName: currentUser.name,
-        teacherSurname: currentUser.surname,
-        subject: currentUser.subject,
-        payload: { record: updatedRecord, notification: newNotification },
-        status: 'pending',
-      };
-      setOfflineQueue((prev) => [...prev, queueItem]);
+      console.warn('Firebase attendance clockout error:', firebaseErr);
     }
 
     try {
@@ -1554,6 +1541,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     coords?: { latitude: number; longitude: number }
   ) => {
     const now = new Date();
+
+    // Strictly enforce: App must NOT allow offline clocking
+    const isCurrentlyOffline = (typeof navigator !== 'undefined' && !navigator.onLine) || !isOnline;
+    if (isCurrentlyOffline) {
+      if (schoolSettings.soundEffectsEnabled !== false) {
+        soundEffects.playErrorBeep();
+      }
+      return {
+        success: false,
+        message: 'Offline Clocking Prohibited: An active internet connection is required to scan badges and record attendance with Dadaya High School Cloud servers.',
+      };
+    }
+
     // Strictly enforce Zimbabwe MoPSE School Terms, Public Holidays, and School Days (Mon-Fri)
     const eligibility = evaluateAttendanceEligibility(now, schoolSettings);
     if (!eligibility.canClock) {

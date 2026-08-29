@@ -25,6 +25,7 @@ export const Navigation: React.FC = () => {
 
   const teacherTabs = [
     { id: 'home', label: 'Clock In', icon: Home },
+    { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
     { id: 'history', label: 'History', icon: Clock },
     { id: 'leave', label: 'Leave', icon: CalendarDays, badge: pendingLeaveCount },
     { id: 'reports', label: 'Reports', icon: FileText },

@@ -26,6 +26,9 @@ import { AdminSettings } from './components/admin/AdminSettings';
 
 import { LocationGate } from './components/common/LocationGate';
 
+import { PhoneNotificationBanner } from './components/common/PhoneNotificationBanner';
+import { NotificationPermissionModal } from './components/common/NotificationPermissionModal';
+
 const MainAppContent: React.FC = () => {
   const { currentUser, isLoading, activeView, setActiveView } = useApp();
 
@@ -106,6 +109,7 @@ const MainAppContent: React.FC = () => {
 
       {/* Main Content Area - Optimized for mobile touch & desktop readability */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6 pb-24 md:pb-12">
+        <PhoneNotificationBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={activeView + '-' + currentUser.role}
@@ -140,6 +144,7 @@ const MainAppContent: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
+      <NotificationPermissionModal />
       <LocationGate>
         <MainAppContent />
       </LocationGate>
