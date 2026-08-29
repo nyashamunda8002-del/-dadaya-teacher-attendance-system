@@ -31,16 +31,6 @@ import {
   Bell,
   Smartphone,
   Check,
-  Cloud,
-  CloudUpload,
-  CloudDownload,
-  History,
-  Trash2,
-  RefreshCw,
-  CalendarClock,
-  Timer,
-  Layers,
-  Info,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { soundEffects } from '../../utils/soundEffects';
@@ -50,7 +40,6 @@ import {
   getNotificationPermission,
   isNotificationSupported,
 } from '../../utils/phoneNotifications';
-import { FirebaseBackupRecord, downloadBackupJSON } from '../../utils/firebaseBackupService';
 
 export const AdminSettings: React.FC = () => {
   const {
@@ -66,31 +55,12 @@ export const AdminSettings: React.FC = () => {
     exportCompleteBackup,
     exportAttendanceCSV,
     restoreBackupData,
-    firebaseBackups,
-    isLoadingBackups,
-    createFirebaseBackupNow,
-    restoreFromFirebaseBackupRecord,
-    deleteFirebaseBackupRecord,
-    refreshFirebaseBackups,
-    toggleScheduledBackup,
-    updateScheduledBackupConfig,
   } = useApp();
 
   const [activeModal, setActiveModal] = useState<'school' | 'rules' | 'backup' | 'confirmReset' | 'termDates' | 'notifications' | null>(null);
   const [backupRestoreStatus, setBackupRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [isBackingUpToCloud, setIsBackingUpToCloud] = useState(false);
-  const [backupTab, setBackupTab] = useState<'scheduled' | 'snapshots' | 'local'>('scheduled');
-  const [confirmRestoreBackup, setConfirmRestoreBackup] = useState<FirebaseBackupRecord | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Scheduled backup form local states
-  const [schedEnabled, setSchedEnabled] = useState(schoolSettings.scheduledBackupEnabled !== false);
-  const [schedFreq, setSchedFreq] = useState<'hourly' | 'daily' | 'weekly'>(
-    schoolSettings.scheduledBackupFrequency || 'daily'
-  );
-  const [schedTime, setSchedTime] = useState(schoolSettings.scheduledBackupTime || '00:00');
-  const [retentionCount, setRetentionCount] = useState(schoolSettings.backupRetentionCount || 30);
 
   // Sound & notification settings
   const [soundEnabled, setSoundEnabled] = useState(schoolSettings.soundEffectsEnabled ?? true);
@@ -132,10 +102,6 @@ export const AdminSettings: React.FC = () => {
     setTermEndDate(schoolSettings.termEndDate || '2026-04-10');
     setTermNotes(schoolSettings.termNotes || 'First Term 2026 - Academic & Co-curricular sessions');
     setNotificationPerm(getNotificationPermission());
-    setSchedEnabled(schoolSettings.scheduledBackupEnabled !== false);
-    setSchedFreq(schoolSettings.scheduledBackupFrequency || 'daily');
-    setSchedTime(schoolSettings.scheduledBackupTime || '00:00');
-    setRetentionCount(schoolSettings.backupRetentionCount || 30);
   }, [schoolSettings]);
 
   // Attendance rules form
@@ -268,86 +234,6 @@ export const AdminSettings: React.FC = () => {
     }
   };
 
-  const handleTriggerCloudBackupNow = async () => {
-    setIsBackingUpToCloud(true);
-    setBackupRestoreStatus(null);
-    try {
-      const res = await createFirebaseBackupNow('manual');
-      if (res.success) {
-        setBackupRestoreStatus({
-          type: 'success',
-          message: res.message || 'Firebase Cloud Backup created successfully!',
-        });
-      } else {
-        setBackupRestoreStatus({
-          type: 'error',
-          message: res.message || 'Failed to generate cloud backup snapshot.',
-        });
-      }
-    } catch (err: any) {
-      setBackupRestoreStatus({
-        type: 'error',
-        message: err?.message || 'Error occurred while connecting to Firebase.',
-      });
-    } finally {
-      setIsBackingUpToCloud(false);
-    }
-  };
-
-  const handleRestoreFromCloudRecord = async (backup: FirebaseBackupRecord) => {
-    setIsRestoring(true);
-    setBackupRestoreStatus(null);
-    try {
-      const res = await restoreFromFirebaseBackupRecord(backup);
-      if (res.success) {
-        setBackupRestoreStatus({
-          type: 'success',
-          message: `Database snapshot restored successfully! (${backup.recordsCount} attendance records and ${backup.teachersCount} faculty profiles).`,
-        });
-        setConfirmRestoreBackup(null);
-      } else {
-        setBackupRestoreStatus({
-          type: 'error',
-          message: res.message || 'Failed to restore cloud snapshot.',
-        });
-      }
-    } catch (err: any) {
-      setBackupRestoreStatus({
-        type: 'error',
-        message: err?.message || 'Error restoring database snapshot.',
-      });
-    } finally {
-      setIsRestoring(false);
-    }
-  };
-
-  const handleDeleteBackup = async (backupId: string) => {
-    const res = await deleteFirebaseBackupRecord(backupId);
-    if (res.success) {
-      setBackupRestoreStatus({ type: 'success', message: 'Cloud backup snapshot deleted successfully.' });
-    } else {
-      setBackupRestoreStatus({ type: 'error', message: res.message });
-    }
-  };
-
-  const handleSaveScheduledBackupSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    toggleScheduledBackup(schedEnabled);
-    updateScheduledBackupConfig({
-      frequency: schedFreq,
-      time: schedTime,
-      retentionCount: Number(retentionCount),
-    });
-    setSaveSuccess(true);
-    setBackupRestoreStatus({
-      type: 'success',
-      message: schedEnabled
-        ? `Scheduled Firebase Cloud Backup configured: ${schedFreq.toUpperCase()} at ${schedTime} CAT.`
-        : 'Automated scheduled backup paused.',
-    });
-    setTimeout(() => setSaveSuccess(false), 2000);
-  };
-
   // Calculate term progress
   const startTs = new Date(schoolSettings.termStartDate || '2026-01-13').getTime();
   const endTs = new Date(schoolSettings.termEndDate || '2026-04-10').getTime();
@@ -405,12 +291,9 @@ export const AdminSettings: React.FC = () => {
     },
     {
       id: 'backup',
-      title: 'Firebase Scheduled Cloud Backups',
-      desc: schoolSettings.scheduledBackupEnabled !== false
-        ? `Automated ${schoolSettings.scheduledBackupFrequency || 'daily'} Firebase backups enabled • ${firebaseBackups.length} cloud snapshots saved`
-        : `Automated backups paused • ${firebaseBackups.length} cloud snapshots available`,
+      title: 'Backup & Restore Database',
+      desc: 'Export complete database logs and configurations',
       icon: Database,
-      badge: schoolSettings.scheduledBackupEnabled !== false ? 'Cloud Auto-Backup ON' : 'Paused',
       action: () => setActiveModal('backup'),
     },
   ];
@@ -1128,77 +1011,63 @@ export const AdminSettings: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden p-6 max-h-[92vh] overflow-y-auto"
+              className="w-full max-w-lg bg-white rounded-3xl shadow-xl overflow-hidden p-6 max-h-[90vh] overflow-y-auto"
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shadow-xs">
-                    <Database className="w-5 h-5" />
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <Database className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-base">Firebase Cloud Backup & Automated Scheduling</h3>
-                    <p className="text-xs text-gray-500">
-                      Automated background database snapshots to Google Cloud Firestore & Instant Recovery
-                    </p>
+                    <h3 className="font-bold text-gray-900 text-sm">Backup & Record Preservation</h3>
+                    <p className="text-[11px] text-gray-500">Secure export, CSV reporting, and cloud synchronization</p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
                     setActiveModal(null);
                     setBackupRestoreStatus(null);
-                    setConfirmRestoreBackup(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition"
+                  className="text-gray-400 hover:text-gray-600 p-1"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Navigation Tabs */}
-              <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl mb-4 text-xs font-bold">
-                <button
-                  onClick={() => setBackupTab('scheduled')}
-                  className={`flex-1 py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 ${
-                    backupTab === 'scheduled'
-                      ? 'bg-white text-emerald-800 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <CalendarClock className="w-3.5 h-3.5" />
-                  <span>Scheduled Cloud Backup</span>
-                </button>
-                <button
-                  onClick={() => setBackupTab('snapshots')}
-                  className={`flex-1 py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 ${
-                    backupTab === 'snapshots'
-                      ? 'bg-white text-emerald-800 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <History className="w-3.5 h-3.5" />
-                  <span>Cloud Snapshots ({firebaseBackups.length})</span>
-                </button>
-                <button
-                  onClick={() => setBackupTab('local')}
-                  className={`flex-1 py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 ${
-                    backupTab === 'local'
-                      ? 'bg-white text-emerald-800 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Offline Export / Import</span>
-                </button>
+              {/* Data Persistence Guarantee Banner */}
+              <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl mb-4 flex items-start gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-900">
+                  <p className="font-bold">Permanent Attendance Protection</p>
+                  <p className="text-[11px] text-blue-700 mt-0.5 leading-relaxed">
+                    Attendance records of logged out teachers are permanently retained. Logging out never deletes history, and all logs are backed up to Cloud Firestore.
+                  </p>
+                </div>
               </div>
 
-              {/* Status Banner */}
+              {/* Current Database Statistics */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-center">
+                  <p className="text-[10px] uppercase font-bold text-slate-600">Total Records</p>
+                  <p className="text-base font-extrabold text-slate-900">{attendanceRecords.length}</p>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-center">
+                  <p className="text-[10px] uppercase font-bold text-slate-600">Faculty Staff</p>
+                  <p className="text-base font-extrabold text-slate-900">{users.length}</p>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl text-center">
+                  <p className="text-[10px] uppercase font-bold text-slate-600">Leave Logs</p>
+                  <p className="text-base font-extrabold text-slate-900">{leaveRequests.length}</p>
+                </div>
+              </div>
+
+              {/* Status Message */}
               {backupRestoreStatus && (
                 <div
-                  className={`p-3.5 rounded-2xl mb-4 text-xs font-semibold flex items-center gap-2.5 ${
+                  className={`p-3 rounded-xl mb-4 text-xs font-semibold flex items-center gap-2 ${
                     backupRestoreStatus.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-900 border border-rose-200'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
                   }`}
                 >
                   {backupRestoreStatus.type === 'success' ? (
@@ -1210,395 +1079,58 @@ export const AdminSettings: React.FC = () => {
                 </div>
               )}
 
-              {/* TAB 1: SCHEDULED CLOUD BACKUP SETTINGS */}
-              {backupTab === 'scheduled' && (
-                <div className="space-y-4">
-                  {/* Cloud Connectivity & Stats Status Card */}
-                  <div className="p-4 bg-gradient-to-br from-emerald-900 to-teal-950 text-white rounded-2xl shadow-md space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CloudCheck className="w-5 h-5 text-emerald-300" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-200">
-                          Google Cloud Firestore Storage
-                        </span>
-                      </div>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-800/80 text-emerald-200 font-semibold">
-                        Real-Time Connected
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-emerald-800/60">
-                      <div>
-                        <p className="text-[10px] text-emerald-300">Live Attendance Logs</p>
-                        <p className="text-base font-extrabold">{attendanceRecords.length} records</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-emerald-300">Faculty Profiles</p>
-                        <p className="text-base font-extrabold">{users.length} teachers</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-emerald-300">Cloud Snapshots</p>
-                        <p className="text-base font-extrabold">{firebaseBackups.length} saved</p>
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] text-emerald-200/90 pt-1 flex items-center justify-between">
-                      <span>
-                        Next Scheduled Run:{' '}
-                        <strong>
-                          {schoolSettings.scheduledBackupEnabled !== false && schoolSettings.nextScheduledBackupAt
-                            ? new Date(schoolSettings.nextScheduledBackupAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              }) +
-                              ' (' +
-                              new Date(schoolSettings.nextScheduledBackupAt).toLocaleDateString([], {
-                                month: 'short',
-                                day: 'numeric',
-                              }) +
-                              ')'
-                            : 'Paused'}
-                        </strong>
-                      </span>
-                      {schoolSettings.lastScheduledBackupAt && (
-                        <span>
-                          Last Run: {new Date(schoolSettings.lastScheduledBackupAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}{' '}
-                          {new Date(schoolSettings.lastScheduledBackupAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
+              {/* Export Section */}
+              <div className="space-y-2 mb-5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 block">Export Options</label>
+                
+                <button
+                  onClick={exportCompleteBackup}
+                  className="w-full p-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileJson className="w-4 h-4 text-emerald-200" />
+                    <span>Download Full System Snapshot (JSON)</span>
                   </div>
+                  <Download className="w-4 h-4" />
+                </button>
 
-                  {/* Schedule Configuration Form */}
-                  <form onSubmit={handleSaveScheduledBackupSettings} className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-200/70">
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-sm">Automated Scheduled Cloud Backups</h4>
-                        <p className="text-[11px] text-slate-500">
-                          Automatically snapshots all attendance records & teacher accounts to Firestore
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSchedEnabled(!schedEnabled)}
-                        className={`w-12 h-6 flex items-center rounded-full p-1 transition duration-300 ${
-                          schedEnabled ? 'bg-emerald-600 justify-end' : 'bg-gray-300 justify-start'
-                        }`}
-                      >
-                        <motion.div
-                          layout
-                          className="bg-white w-4 h-4 rounded-full shadow-md"
-                        />
-                      </button>
-                    </div>
-
-                    {schedEnabled && (
-                      <div className="space-y-3 pt-1">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                              Backup Frequency
-                            </label>
-                            <select
-                              value={schedFreq}
-                              onChange={(e) => setSchedFreq(e.target.value as any)}
-                              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                            >
-                              <option value="daily">Daily (Every 24 Hours)</option>
-                              <option value="weekly">Weekly (Every Sunday)</option>
-                              <option value="hourly">Hourly (Continuous)</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                              Scheduled Execution Time (CAT)
-                            </label>
-                            <input
-                              type="time"
-                              value={schedTime}
-                              onChange={(e) => setSchedTime(e.target.value)}
-                              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                            Snapshot Retention Policy
-                          </label>
-                          <select
-                            value={retentionCount}
-                            onChange={(e) => setRetentionCount(Number(e.target.value))}
-                            className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                          >
-                            <option value={15}>Keep last 15 snapshots</option>
-                            <option value={30}>Keep last 30 snapshots (Recommended - 1 Month)</option>
-                            <option value={60}>Keep last 60 snapshots (2 Months)</option>
-                            <option value={90}>Keep last 90 snapshots (Full Term)</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between pt-2">
-                      <p className="text-[10px] text-slate-400">
-                        {schedEnabled
-                          ? `Scheduled to snapshot every ${schedFreq} at ${schedTime} Central Africa Time.`
-                          : 'Automated backups are currently paused.'}
-                      </p>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Save Schedule Settings</span>
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Instant Manual Cloud Backup Button */}
-                  <div className="p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-emerald-950 text-xs">Manual Firebase Cloud Snapshot</h4>
-                      <p className="text-[11px] text-emerald-700">Take an immediate full database snapshot to Firebase right now</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleTriggerCloudBackupNow}
-                      disabled={isBackingUpToCloud}
-                      className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <CloudUpload className={`w-4 h-4 ${isBackingUpToCloud ? 'animate-bounce' : ''}`} />
-                      <span>{isBackingUpToCloud ? 'Snapshotting to Firebase...' : 'Backup to Cloud Now'}</span>
-                    </button>
+                <button
+                  onClick={exportAttendanceCSV}
+                  className="w-full p-3 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-slate-300" />
+                    <span>Export Attendance Ledger (Excel / CSV)</span>
                   </div>
-                </div>
-              )}
-
-              {/* TAB 2: CLOUD SNAPSHOTS HISTORY & RESTORE */}
-              {backupTab === 'snapshots' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                    <p className="text-xs text-gray-500 font-medium">
-                      {firebaseBackups.length} snapshot{firebaseBackups.length === 1 ? '' : 's'} stored in Firebase Firestore
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={refreshFirebaseBackups}
-                        disabled={isLoadingBackups}
-                        className="text-xs text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 p-1 hover:bg-emerald-50 rounded-lg transition"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBackups ? 'animate-spin' : ''}`} />
-                        <span>Refresh</span>
-                      </button>
-                      <button
-                        onClick={handleTriggerCloudBackupNow}
-                        disabled={isBackingUpToCloud}
-                        className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition"
-                      >
-                        <CloudUpload className="w-3.5 h-3.5" />
-                        <span>Create Snapshot</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {firebaseBackups.length === 0 ? (
-                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
-                      <Database className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="text-xs font-bold text-slate-700">No Cloud Snapshots Saved Yet</p>
-                      <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                        Once scheduled backups run or you create a manual snapshot, your preserved records will appear here with 1-click restore.
-                      </p>
-                      <button
-                        onClick={handleTriggerCloudBackupNow}
-                        disabled={isBackingUpToCloud}
-                        className="mt-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs"
-                      >
-                        Create First Cloud Backup
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                      {firebaseBackups.map((b) => (
-                        <div
-                          key={b.id}
-                          className="p-3 bg-white border border-slate-200 hover:border-emerald-300 rounded-2xl flex items-center justify-between gap-3 shadow-2xs transition"
-                        >
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs text-slate-900">
-                                {new Date(b.timestamp).toLocaleDateString([], {
-                                  weekday: 'short',
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}{' '}
-                                • {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                              <span
-                                className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${
-                                  b.type === 'scheduled'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-emerald-100 text-emerald-800'
-                                }`}
-                              >
-                                {b.type}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500">
-                              {b.recordsCount} attendance logs • {b.teachersCount} faculty • {b.leaveCount} leave logs
-                              {b.sizeBytes ? ` • ${(b.sizeBytes / 1024).toFixed(1)} KB` : ''}
-                            </p>
-                            <p className="text-[10px] text-slate-400 italic truncate max-w-md">
-                              Source: {b.triggeredBy}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              onClick={() => downloadBackupJSON(b)}
-                              title="Download JSON to Computer"
-                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setConfirmRestoreBackup(b)}
-                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition flex items-center gap-1"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>Restore</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBackup(b.id)}
-                              title="Delete from Firebase"
-                              className="p-1.5 text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 3: OFFLINE FILE EXPORT & IMPORT */}
-              {backupTab === 'local' && (
-                <div className="space-y-4">
-                  {/* Export Section */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 block">
-                      Download File Exports
-                    </label>
-
-                    <button
-                      onClick={exportCompleteBackup}
-                      className="w-full p-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileJson className="w-4 h-4 text-emerald-200" />
-                        <span>Download Full System Snapshot (JSON)</span>
-                      </div>
-                      <Download className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      onClick={exportAttendanceCSV}
-                      className="w-full p-3 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-between transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="w-4 h-4 text-slate-300" />
-                        <span>Export Attendance Ledger (Excel / CSV)</span>
-                      </div>
-                      <Download className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Import / Restore Section */}
-                  <div className="space-y-2 pt-3 border-t border-gray-100">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 block">
-                      Restore / Import Local JSON File
-                    </label>
-
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      accept=".json,application/json"
-                      className="hidden"
-                    />
-
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isRestoring}
-                      className="w-full p-3 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
-                    >
-                      <Upload className="w-4 h-4 text-slate-500" />
-                      <span>{isRestoring ? 'Restoring records...' : 'Select JSON Backup File to Restore'}</span>
-                    </button>
-                    <p className="text-[10px] text-gray-400 text-center">
-                      Restoring will merge records and synchronize with Cloud Firestore.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Confirm Restore from Cloud Snapshot Modal */}
-      <AnimatePresence>
-        {confirmRestoreBackup && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 text-center space-y-4"
-            >
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-                <RotateCcw className="w-6 h-6" />
+                  <Download className="w-4 h-4" />
+                </button>
               </div>
-              <div>
-                <h3 className="font-bold text-gray-900 text-base">Restore Database Snapshot?</h3>
-                <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                  You are about to restore the snapshot from{' '}
-                  <strong>
-                    {new Date(confirmRestoreBackup.timestamp).toLocaleDateString()} at{' '}
-                    {new Date(confirmRestoreBackup.timestamp).toLocaleTimeString()}
-                  </strong>
-                  . This contains {confirmRestoreBackup.recordsCount} attendance records and{' '}
-                  {confirmRestoreBackup.teachersCount} faculty profiles.
+
+              {/* Import / Restore Section */}
+              <div className="space-y-2 pt-3 border-t border-gray-100">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 block">
+                  Restore / Import Backup
+                </label>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept=".json,application/json"
+                  className="hidden"
+                />
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isRestoring}
+                  className="w-full p-3 border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <Upload className="w-4 h-4 text-slate-500" />
+                  <span>{isRestoring ? 'Restoring records...' : 'Select JSON Backup File to Restore'}</span>
+                </button>
+                <p className="text-[10px] text-gray-400 text-center">
+                  Restoring will merge records and synchronize with Cloud Firestore.
                 </p>
-              </div>
-
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-[11px] text-amber-900 flex items-start gap-2">
-                <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <span>Existing records will be safely merged and updated across all devices via Firestore.</span>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setConfirmRestoreBackup(null)}
-                  disabled={isRestoring}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-semibold text-xs rounded-xl hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRestoreFromCloudRecord(confirmRestoreBackup)}
-                  disabled={isRestoring}
-                  className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  <RotateCcw className={`w-3.5 h-3.5 ${isRestoring ? 'animate-spin' : ''}`} />
-                  <span>{isRestoring ? 'Restoring...' : 'Confirm Restore'}</span>
-                </button>
               </div>
             </motion.div>
           </div>

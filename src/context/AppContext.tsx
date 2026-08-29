@@ -19,18 +19,10 @@ import {
   LeaveRequest,
   LeaveStatus,
   QueuedOfflineAction,
-  FirebaseBackupRecord,
 } from '../types';
 import { soundEffects } from '../utils/soundEffects';
 import { sendPhoneNotification, initializeBackgroundNotificationService } from '../utils/phoneNotifications';
 import { evaluateAttendanceEligibility } from '../utils/zimbabweCalendar';
-import {
-  createFirebaseCloudBackup,
-  getFirebaseCloudBackups,
-  deleteFirebaseCloudBackup,
-  calculateNextScheduledBackupTime,
-  isScheduledBackupDue,
-} from '../utils/firebaseBackupService';
 
 interface AppContextType {
   currentUser: User | null;
@@ -49,22 +41,6 @@ interface AppContextType {
   isSyncingQueue: boolean;
   syncOfflineQueue: () => Promise<{ success: boolean; syncedCount: number; message: string }>;
   clearOfflineQueue: () => void;
-  // Firebase Scheduled Cloud Backups
-  firebaseBackups: FirebaseBackupRecord[];
-  isLoadingBackups: boolean;
-  createFirebaseBackupNow: (
-    type?: 'scheduled' | 'manual',
-    triggeredBy?: string
-  ) => Promise<{ success: boolean; message: string; backup?: FirebaseBackupRecord }>;
-  restoreFromFirebaseBackupRecord: (backup: FirebaseBackupRecord) => Promise<{ success: boolean; message: string }>;
-  deleteFirebaseBackupRecord: (backupId: string) => Promise<{ success: boolean; message: string }>;
-  refreshFirebaseBackups: () => Promise<void>;
-  toggleScheduledBackup: (enabled: boolean) => void;
-  updateScheduledBackupConfig: (config: {
-    frequency?: 'hourly' | 'daily' | 'weekly';
-    time?: string;
-    retentionCount?: number;
-  }) => void;
   registerTeacher: (data: {
     name: string;
     surname: string;
@@ -150,12 +126,6 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
   soundEffectsEnabled: true,
   phoneNotificationsEnabled: true,
-  scheduledBackupEnabled: true,
-  scheduledBackupFrequency: 'daily',
-  scheduledBackupTime: '00:00',
-  backupRetentionCount: 30,
-  lastScheduledBackupAt: null,
-  nextScheduledBackupAt: null,
 };
 
 export const DADAYA_ADMIN_CREDENTIALS = {
@@ -319,8 +289,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFirebaseLinked, setIsFirebaseLinked] = useState<boolean>(true);
-  const [firebaseBackups, setFirebaseBackups] = useState<FirebaseBackupRecord[]>([]);
-  const [isLoadingBackups, setIsLoadingBackups] = useState<boolean>(false);
   const [activeView, setActiveViewState] = useState<string>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (saved) {
@@ -349,23 +317,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Background notification service initialization (public holiday greetings & reminders)
   useEffect(() => {
-    const cleanup = initializeBackgroundNotificationService(() => {
-      const today = getTodayDateStr();
-      const rec = attendanceRecords.find((r) => r.userId === currentUser?.id && r.date === today);
-      const clockedIn = !!rec?.clockInTime;
-      const clockedOut = !!rec?.clockOutTime;
-      return {
-        isLoggedIn: !!currentUser,
-        userRole: currentUser?.role,
-        todayClockedIn: clockedIn,
-        todayClockedOut: clockedOut,
-        isSchoolDay: isSchoolDay(new Date()),
-      };
-    });
+    const cleanup = initializeBackgroundNotificationService();
     return () => {
       cleanup();
     };
-  }, [currentUser, attendanceRecords]);
+  }, []);
 
   // Live real-time Firestore synchronization & backend loading
   useEffect(() => {
@@ -374,7 +330,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubscribeNotifs: (() => void) | null = null;
     let unsubscribeSettings: (() => void) | null = null;
     let unsubscribeLeave: (() => void) | null = null;
-    let unsubscribeBackups: (() => void) | null = null;
 
     try {
       // 1. Listen to Users in Firebase Firestore
@@ -432,24 +387,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: docSnap.id,
               ...docSnap.data(),
             } as EarlyClockNotification));
-
-            // Cross-device push alert: If admin and a new unacknowledged teacher alert arrived in the last 2 minutes
-            if (currentUser?.role === 'admin') {
-              const nowTs = Date.now();
-              snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added') {
-                  const data = change.doc.data() as EarlyClockNotification;
-                  if (data && !data.acknowledgedByAdmin && data.timestamp && (nowTs - data.timestamp < 120000)) {
-                    sendPhoneNotification({
-                      title: data.type === 'early_out' ? '⏱️ Teacher Early Departure' : '⚠️ Teacher Notice',
-                      body: `${data.teacherName} ${data.teacherSurname}: ${data.reason}`,
-                      tag: `admin-notif-${data.id}`,
-                    });
-                  }
-                }
-              });
-            }
-
             setNotifications(firestoreNotifs);
           }
         },
@@ -494,50 +431,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: docSnap.id,
               ...docSnap.data(),
             } as LeaveRequest));
-
-            // Cross-device push alert: If teacher and their leave status was reviewed
-            if (currentUser?.role === 'teacher') {
-              snapshot.docChanges().forEach((change) => {
-                if (change.type === 'modified') {
-                  const data = change.doc.data() as LeaveRequest;
-                  if (data && data.userId === currentUser.id && (data.status === 'approved' || data.status === 'rejected')) {
-                    sendPhoneNotification({
-                      title: data.status === 'approved' ? '✅ Leave Application Approved' : '❌ Leave Application Declined',
-                      body: `Your ${data.leaveType.toUpperCase()} leave request (${data.startDate} to ${data.endDate}) was ${data.status} by Administration.`,
-                      tag: `teacher-leave-${data.id}`,
-                    });
-                  }
-                }
-              });
-            }
-
             setLeaveRequests(firestoreLeaves);
           }
         },
         (error) => {
           console.warn('Firebase leave requests listener fallback:', error);
-        }
-      );
-
-      // 6. Listen to Database Backups in Firebase Firestore
-      const backupsCol = collection(db, 'backups');
-      unsubscribeBackups = onSnapshot(
-        backupsCol,
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const firestoreBackups: FirebaseBackupRecord[] = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...docSnap.data(),
-            } as FirebaseBackupRecord));
-            firestoreBackups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setFirebaseBackups(firestoreBackups);
-          } else {
-            getFirebaseCloudBackups().then((b) => setFirebaseBackups(b)).catch(() => null);
-          }
-        },
-        (error) => {
-          console.warn('Firebase backups listener fallback:', error);
-          getFirebaseCloudBackups().then((b) => setFirebaseBackups(b)).catch(() => null);
         }
       );
     } catch (firebaseErr) {
@@ -671,7 +569,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubscribeNotifs) unsubscribeNotifs();
       if (unsubscribeSettings) unsubscribeSettings();
       if (unsubscribeLeave) unsubscribeLeave();
-      if (unsubscribeBackups) unsubscribeBackups();
     };
   }, []);
 
@@ -2219,198 +2116,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Firebase Scheduled & Manual Cloud Backup Methods
-  const createFirebaseBackupNow = async (
-    type: 'scheduled' | 'manual' = 'manual',
-    triggeredBy?: string
-  ): Promise<{ success: boolean; message: string; backup?: FirebaseBackupRecord }> => {
-    setIsLoadingBackups(true);
-    try {
-      const caller =
-        triggeredBy ||
-        (currentUser
-          ? `${currentUser.name} ${currentUser.surname} (${currentUser.role === 'admin' ? 'Administrator' : 'Staff'})`
-          : 'System Administrator');
-
-      const freq = schoolSettings.scheduledBackupFrequency || 'daily';
-      const timeStr = schoolSettings.scheduledBackupTime || '00:00';
-
-      const result = await createFirebaseCloudBackup({
-        type,
-        triggeredBy: caller,
-        frequency: freq,
-        data: {
-          users,
-          attendanceRecords,
-          leaveRequests,
-          notifications,
-          schoolSettings,
-        },
-      });
-
-      if (result.success && result.backup) {
-        const nowIso = new Date().toISOString();
-        const nextDate = calculateNextScheduledBackupTime(freq, timeStr, nowIso);
-        
-        updateSchoolSettings({
-          lastScheduledBackupAt: nowIso,
-          nextScheduledBackupAt: nextDate.toISOString(),
-        });
-
-        const refreshed = await getFirebaseCloudBackups();
-        setFirebaseBackups(refreshed);
-
-        if (schoolSettings.soundEffectsEnabled !== false) {
-          soundEffects.playSuccess();
-        }
-      }
-
-      return result;
-    } catch (err: any) {
-      console.error('Manual/Scheduled Firebase backup trigger error:', err);
-      return { success: false, message: err?.message || 'Failed to generate cloud backup.' };
-    } finally {
-      setIsLoadingBackups(false);
-    }
-  };
-
-  const restoreFromFirebaseBackupRecord = async (
-    backup: FirebaseBackupRecord
-  ): Promise<{ success: boolean; message: string }> => {
-    if (!backup || !backup.data) {
-      return { success: false, message: 'Corrupt or invalid backup record selected.' };
-    }
-    return await restoreBackupData(backup.data);
-  };
-
-  const deleteFirebaseBackupRecord = async (backupId: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const ok = await deleteFirebaseCloudBackup(backupId);
-      if (ok) {
-        setFirebaseBackups((prev) => prev.filter((b) => b.id !== backupId));
-        return { success: true, message: 'Firebase cloud backup deleted successfully.' };
-      }
-      return { success: false, message: 'Could not delete backup from cloud storage.' };
-    } catch (err: any) {
-      return { success: false, message: err?.message || 'Delete operation failed.' };
-    }
-  };
-
-  const refreshFirebaseBackups = async (): Promise<void> => {
-    setIsLoadingBackups(true);
-    try {
-      const data = await getFirebaseCloudBackups();
-      setFirebaseBackups(data);
-    } catch (e) {
-      console.warn('Error refreshing cloud backups:', e);
-    } finally {
-      setIsLoadingBackups(false);
-    }
-  };
-
-  const toggleScheduledBackup = (enabled: boolean) => {
-    const freq = schoolSettings.scheduledBackupFrequency || 'daily';
-    const timeStr = schoolSettings.scheduledBackupTime || '00:00';
-    const nextDate = enabled
-      ? calculateNextScheduledBackupTime(freq, timeStr, schoolSettings.lastScheduledBackupAt)
-      : null;
-
-    updateSchoolSettings({
-      scheduledBackupEnabled: enabled,
-      nextScheduledBackupAt: nextDate ? nextDate.toISOString() : null,
-    });
-
-    sendPhoneNotification({
-      title: enabled ? '☁️ Scheduled Cloud Backup Activated' : '⏸️ Cloud Backup Paused',
-      body: enabled
-        ? `Automated Firebase database snapshots are set to run ${freq} (${timeStr} CAT).`
-        : 'Automated scheduled backups to Firebase are currently disabled.',
-      tag: 'backup-schedule-toggle',
-    });
-  };
-
-  const updateScheduledBackupConfig = (config: {
-    frequency?: 'hourly' | 'daily' | 'weekly';
-    time?: string;
-    retentionCount?: number;
-  }) => {
-    const freq = config.frequency || schoolSettings.scheduledBackupFrequency || 'daily';
-    const timeStr = config.time || schoolSettings.scheduledBackupTime || '00:00';
-    const nextDate = calculateNextScheduledBackupTime(freq, timeStr, schoolSettings.lastScheduledBackupAt);
-
-    updateSchoolSettings({
-      scheduledBackupFrequency: freq,
-      scheduledBackupTime: timeStr,
-      backupRetentionCount: config.retentionCount ?? schoolSettings.backupRetentionCount ?? 30,
-      nextScheduledBackupAt: nextDate.toISOString(),
-    });
-  };
-
-  // Automated Scheduled Firebase Cloud Backup Engine Loop
-  useEffect(() => {
-    const checkAndRunAutoBackup = async () => {
-      // Check if scheduled backups are enabled
-      if (schoolSettings.scheduledBackupEnabled === false) return;
-
-      const freq = schoolSettings.scheduledBackupFrequency || 'daily';
-      const timeStr = schoolSettings.scheduledBackupTime || '00:00';
-      const lastAt = schoolSettings.lastScheduledBackupAt;
-
-      if (isScheduledBackupDue(freq, timeStr, lastAt)) {
-        console.log('⏰ Scheduled Firebase Cloud Backup is due! Executing snapshot...');
-        const nowIso = new Date().toISOString();
-        const nextDate = calculateNextScheduledBackupTime(freq, timeStr, nowIso);
-
-        const res = await createFirebaseCloudBackup({
-          type: 'scheduled',
-          triggeredBy: `Firebase Cloud Auto-Scheduler (${freq} at ${timeStr} CAT)`,
-          frequency: freq,
-          data: {
-            users,
-            attendanceRecords,
-            leaveRequests,
-            notifications,
-            schoolSettings,
-          },
-        });
-
-        if (res.success && res.backup) {
-          updateSchoolSettings({
-            lastScheduledBackupAt: nowIso,
-            nextScheduledBackupAt: nextDate.toISOString(),
-          });
-
-          const refreshed = await getFirebaseCloudBackups();
-          setFirebaseBackups(refreshed);
-
-          sendPhoneNotification({
-            title: '☁️ Scheduled Cloud Backup Complete',
-            body: `Dadaya database snapshot preserved in Firebase (${res.backup.recordsCount} attendance records, ${res.backup.teachersCount} teachers).`,
-            tag: 'firebase-auto-backup-done',
-          });
-        }
-      }
-    };
-
-    // Check shortly after boot (5s), then every 60s
-    const initialTimer = setTimeout(checkAndRunAutoBackup, 5000);
-    const intervalTimer = setInterval(checkAndRunAutoBackup, 60000);
-
-    return () => {
-      clearTimeout(initialTimer);
-      clearInterval(intervalTimer);
-    };
-  }, [
-    schoolSettings.scheduledBackupEnabled,
-    schoolSettings.scheduledBackupFrequency,
-    schoolSettings.scheduledBackupTime,
-    schoolSettings.lastScheduledBackupAt,
-    users,
-    attendanceRecords,
-    leaveRequests,
-    notifications,
-  ]);
-
   const clearAttendanceRecords = async (): Promise<{ success: boolean; message: string }> => {
     try {
       setAttendanceRecords([]);
@@ -2551,15 +2256,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSyncingQueue,
         syncOfflineQueue,
         clearOfflineQueue,
-        // Firebase Cloud Backups
-        firebaseBackups,
-        isLoadingBackups,
-        createFirebaseBackupNow,
-        restoreFromFirebaseBackupRecord,
-        deleteFirebaseBackupRecord,
-        refreshFirebaseBackups,
-        toggleScheduledBackup,
-        updateScheduledBackupConfig,
         isSchoolDay,
         isWeekend,
         currentDayName,

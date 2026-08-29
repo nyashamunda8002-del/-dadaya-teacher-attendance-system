@@ -78,28 +78,6 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Handle direct message from client app to show notification through Service Worker
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
-    const { title, options } = event.data;
-    event.waitUntil(
-      self.registration.showNotification(title || 'Dadaya High School Attendance', {
-        body: options?.body || 'Attendance notice',
-        icon: options?.icon || '/pwa-192x192.png',
-        badge: options?.badge || '/pwa-192x192.png',
-        vibrate: options?.vibrate || [200, 100, 200, 100, 200],
-        tag: options?.tag || `dadaya-${Date.now()}`,
-        data: options?.data || { url: '/' },
-        renotify: true,
-        requireInteraction: false,
-        actions: options?.actions || [
-          { action: 'open', title: 'Open App' }
-        ],
-      })
-    );
-  }
-});
-
 // Handle Push notifications
 self.addEventListener('push', (event) => {
   if (event.data) {
@@ -109,13 +87,8 @@ self.addEventListener('push', (event) => {
         body: data.body || 'New Dadaya High School notification',
         icon: data.icon || '/pwa-192x192.png',
         badge: data.badge || '/pwa-192x192.png',
-        vibrate: data.vibrate || [200, 100, 200, 100, 200],
+        vibrate: [200, 100, 200],
         data: data.data || { url: '/' },
-        tag: data.tag || `dadaya-push-${Date.now()}`,
-        renotify: true,
-        actions: [
-          { action: 'open', title: 'Open App' }
-        ],
       };
       event.waitUntil(self.registration.showNotification(data.title || 'Dadaya Attendance', options));
     } catch {
@@ -124,10 +97,6 @@ self.addEventListener('push', (event) => {
         self.registration.showNotification('Dadaya Attendance', {
           body: text,
           icon: '/pwa-192x192.png',
-          badge: '/pwa-192x192.png',
-          vibrate: [200, 100, 200],
-          tag: `dadaya-push-${Date.now()}`,
-          renotify: true,
         })
       );
     }

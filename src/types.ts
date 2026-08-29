@@ -115,42 +115,6 @@ export interface SchoolSettings {
   lockMessage?: string;
   soundEffectsEnabled?: boolean;
   phoneNotificationsEnabled?: boolean;
-  // Scheduled Firebase Cloud Backup Settings
-  scheduledBackupEnabled?: boolean;
-  scheduledBackupFrequency?: 'hourly' | 'daily' | 'weekly';
-  scheduledBackupTime?: string; // e.g. "00:00" (midnight) or "17:00" (after duty)
-  lastScheduledBackupAt?: string | null;
-  nextScheduledBackupAt?: string | null;
-  backupRetentionCount?: number; // default 30
-}
-
-export type BackupType = 'scheduled' | 'manual';
-export type BackupStatus = 'completed' | 'in_progress' | 'failed';
-
-export interface FirebaseBackupRecord {
-  id: string;
-  backupName: string;
-  timestamp: string; // ISO format
-  type: BackupType;
-  scheduleFrequency?: string;
-  status: BackupStatus;
-  recordsCount: number;
-  teachersCount: number;
-  leaveCount: number;
-  notificationsCount: number;
-  sizeBytes?: number;
-  triggeredBy: string;
-  academicYear: string;
-  term: string;
-  schoolName: string;
-  data: {
-    users: User[];
-    attendanceRecords: AttendanceRecord[];
-    leaveRequests: LeaveRequest[];
-    notifications: EarlyClockNotification[];
-    schoolSettings: SchoolSettings;
-  };
-  createdAt: string;
 }
 
 export type OfflineActionType = 'clock_in' | 'clock_out' | 'leave_request';

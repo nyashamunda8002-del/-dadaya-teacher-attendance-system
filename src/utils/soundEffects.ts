@@ -110,10 +110,6 @@ class SoundFX {
     this.playBadgeScan();
   }
 
-  playSuccess() {
-    this.playClockInSuccess();
-  }
-
   // Error / Alert double buzz
   playErrorBeep() {
     try {

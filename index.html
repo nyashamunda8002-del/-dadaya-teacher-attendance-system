@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Dadaya High School Attendance System</title>
-    <meta name="description" content="Dadaya High School Teacher & Admin Attendance System with Zimbabwe MoPSE calendar compliance, termly reports, automated Firebase scheduled cloud backups, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings." />
+    <meta name="description" content="Dadaya High School Teacher & Admin Attendance System with Zimbabwe MoPSE calendar compliance, termly reports, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings." />
     <meta name="theme-color" content="#064e3b" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,22 +14,18 @@
     <meta name="msapplication-TileColor" content="#064e3b" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta property="og:title" content="Dadaya High School Attendance System" />
-    <meta property="og:description" content="Dadaya High School Teacher & Admin Attendance System with Zimbabwe MoPSE calendar compliance, termly reports, automated Firebase scheduled cloud backups, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings." />
+    <meta property="og:description" content="Dadaya High School Teacher & Admin Attendance System with Zimbabwe MoPSE calendar compliance, termly reports, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings." />
     <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script>
-      // Register Service Worker for mobile phone notifications and PWA offline support
+      // Clean up any previously registered service workers to prevent PWA install prompts
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js')
-            .then(function(reg) {
-              console.log('Dadaya Service Worker registered with scope:', reg.scope);
-            })
-            .catch(function(err) {
-              console.warn('Service Worker registration note:', err);
-            });
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
         });
       }
     </script>

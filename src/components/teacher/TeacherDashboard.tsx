@@ -22,15 +22,10 @@ import {
   ChevronRight,
   UserCheck,
   WifiOff,
-  BellRing,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EarlyClockModal } from './EarlyClockModal';
 import { evaluateAttendanceEligibility } from '../../utils/zimbabweCalendar';
-import {
-  getNotificationPermission,
-  requestPhoneNotificationPermission,
-} from '../../utils/phoneNotifications';
 
 export const TeacherDashboard: React.FC = () => {
   const {
@@ -66,16 +61,6 @@ export const TeacherDashboard: React.FC = () => {
     lng: schoolSettings.schoolLongitude,
   });
   const [distanceMeters, setDistanceMeters] = useState<number>(0);
-  const [notifPerm, setNotifPerm] = useState<string>(getNotificationPermission());
-
-  useEffect(() => {
-    setNotifPerm(getNotificationPermission());
-  }, []);
-
-  const handleEnablePhoneNotifications = async () => {
-    const res = await requestPhoneNotificationPermission();
-    setNotifPerm(res.permission);
-  };
 
   // Real-time digital clock ticker
   useEffect(() => {
@@ -206,12 +191,6 @@ export const TeacherDashboard: React.FC = () => {
         text: res.message,
         type: res.success ? 'success' : 'error',
       });
-
-      if (res.success && getNotificationPermission() === 'default') {
-        setTimeout(() => {
-          requestPhoneNotificationPermission().catch(() => {});
-        }, 1200);
-      }
     }
   };
 
@@ -264,12 +243,6 @@ export const TeacherDashboard: React.FC = () => {
         text: res.message,
         type: res.success ? 'success' : 'error',
       });
-
-      if (res.success && getNotificationPermission() === 'default') {
-        setTimeout(() => {
-          requestPhoneNotificationPermission().catch(() => {});
-        }, 1200);
-      }
     }
   };
 
@@ -464,34 +437,6 @@ export const TeacherDashboard: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Direct Phone Notification Enable Card if not yet granted */}
-      {notifPerm !== 'granted' && (
-        <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 border border-emerald-700/60 text-white rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-800 border border-emerald-600/50 flex items-center justify-center text-emerald-300 shrink-0">
-              <BellRing className="w-4 h-4 text-emerald-300 animate-bounce" />
-            </div>
-            <div>
-              <div className="font-bold text-xs sm:text-sm text-white flex items-center gap-1.5">
-                <span>Enable Phone Notifications</span>
-                <span className="px-1.5 py-0.2 bg-emerald-500/30 text-emerald-200 text-[9px] font-bold rounded-full uppercase">
-                  Instant Alerts
-                </span>
-              </div>
-              <p className="text-[11px] text-emerald-100/90 leading-tight mt-0.5">
-                Receive instant clock-in confirmations, absence notices, and shift alerts directly in your phone shade.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleEnablePhoneNotifications}
-            className="px-3 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-extrabold text-xs rounded-xl shadow-xs shrink-0 cursor-pointer transition active:scale-95"
-          >
-            Allow
-          </button>
-        </div>
-      )}
 
       {/* Today's Times & Primary Clock Action Card */}
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
