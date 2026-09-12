@@ -40,6 +40,7 @@ import {
   getNotificationPermission,
   isNotificationSupported,
 } from '../../utils/phoneNotifications';
+import { SchoolCampusMap } from '../common/SchoolCampusMap';
 
 export const AdminSettings: React.FC = () => {
   const {
@@ -790,10 +791,13 @@ export const AdminSettings: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden p-6"
+              className="w-full max-w-xl bg-white rounded-3xl shadow-xl overflow-hidden p-6 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-base">School Information</h3>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">School & Geofence Configuration</h3>
+                  <p className="text-[11px] text-gray-500">Google Maps boundary and GPS coordinate setup</p>
+                </div>
                 <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
@@ -802,9 +806,28 @@ export const AdminSettings: React.FC = () => {
               {saveSuccess && (
                 <div className="mb-4 p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>School details saved successfully!</span>
+                  <span>School details and Google Maps geofence saved successfully!</span>
                 </div>
               )}
+
+              {/* Interactive Google Map preview for admin */}
+              <div className="mb-4">
+                <SchoolCampusMap
+                  schoolSettings={{
+                    ...schoolSettings,
+                    schoolLatitude: Number(latitude),
+                    schoolLongitude: Number(longitude),
+                    allowedRadiusMeters: Number(allowedRadius),
+                  }}
+                  onSelectCoordinates={(coords) => {
+                    setLatitude(coords.latitude);
+                    setLongitude(coords.longitude);
+                  }}
+                  height="220px"
+                  title="Campus Geofence Target"
+                  showFenceInfo={true}
+                />
+              </div>
 
               <form onSubmit={handleSaveSchoolInfo} className="space-y-3.5 text-xs">
                 <div>
@@ -836,10 +859,10 @@ export const AdminSettings: React.FC = () => {
                       value={latitude}
                       onChange={(e) => setLatitude(Number(e.target.value))}
                       required
-                      placeholder="-20.340490"
+                      placeholder="-20.334154"
                       className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono"
                     />
-                    <p className="text-[10px] text-gray-400 mt-0.5">20.340490° S = -20.340490</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">20.334154° S = -20.334154</p>
                   </div>
                   <div>
                     <label className="font-semibold text-gray-700 block mb-1">Longitude (°E positive)</label>
@@ -849,10 +872,10 @@ export const AdminSettings: React.FC = () => {
                       value={longitude}
                       onChange={(e) => setLongitude(Number(e.target.value))}
                       required
-                      placeholder="29.977820"
+                      placeholder="29.896333"
                       className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono"
                     />
-                    <p className="text-[10px] text-gray-400 mt-0.5">29.977820° E = 29.977820</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">29.896333° E = 29.896333</p>
                   </div>
                 </div>
                 <div>

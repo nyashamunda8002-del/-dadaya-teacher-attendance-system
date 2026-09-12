@@ -207,7 +207,7 @@ export const TeacherProfile: React.FC = () => {
             </div>
             <div>
               <h4 className="text-sm font-bold text-gray-900">About App</h4>
-              <p className="text-xs text-gray-500">Dadaya High School Attendance System v2.4 (Commercial Edition)</p>
+              <p className="text-xs text-gray-500">Dadaya High Staff Clocking System v2.4 (Commercial Edition)</p>
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -398,11 +398,11 @@ export const TeacherProfile: React.FC = () => {
                 Dadaya High School
               </h3>
               <p className="text-xs text-emerald-700 font-semibold uppercase tracking-widest mb-4">
-                Staff Attendance Management System
+                Staff Clocking System
               </p>
 
               <div className="bg-slate-50 p-4 rounded-2xl text-xs text-gray-600 text-left space-y-2 border border-slate-100">
-                <p><strong>System:</strong> Dadaya High School Staff Attendance Portal</p>
+                <p><strong>System:</strong> Dadaya High Staff Clocking System</p>
                 <p><strong>Developer / Author:</strong> <span className="font-bold text-emerald-800">Nyasha Munda</span></p>
                 <p><strong>Institution:</strong> Dadaya High School, Zvishavane, Zimbabwe</p>
                 <p><strong>Capabilities:</strong> Real-time GPS verification, Cloud SQL synchronization, Early departure admin alerts, and automated attendance reporting.</p>

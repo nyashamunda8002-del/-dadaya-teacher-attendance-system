@@ -22,10 +22,12 @@ import {
   ChevronRight,
   UserCheck,
   WifiOff,
+  Map as MapIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EarlyClockModal } from './EarlyClockModal';
 import { evaluateAttendanceEligibility } from '../../utils/zimbabweCalendar';
+import { SchoolCampusMap } from '../common/SchoolCampusMap';
 
 export const TeacherDashboard: React.FC = () => {
   const {
@@ -41,6 +43,10 @@ export const TeacherDashboard: React.FC = () => {
     isSchoolDay,
     isWeekend,
     isOnline,
+    isDemoMode,
+    demoCoords,
+    setSimulationMode,
+    simulationStatus,
   } = useApp();
 
   const isOffline = !isOnline || (typeof navigator !== 'undefined' && !navigator.onLine);
@@ -61,6 +67,12 @@ export const TeacherDashboard: React.FC = () => {
     lng: schoolSettings.schoolLongitude,
   });
   const [distanceMeters, setDistanceMeters] = useState<number>(0);
+  const [showCampusMap, setShowCampusMap] = useState<boolean>(true);
+
+  // Active coordinates used for attendance: If in demo mode, use demoCoords; else use live GPS
+  const effectiveCoords = isDemoMode
+    ? { lat: demoCoords.latitude, lng: demoCoords.longitude }
+    : currentCoords;
 
   // Real-time digital clock ticker
   useEffect(() => {
@@ -70,8 +82,9 @@ export const TeacherDashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Automatically acquire and monitor live device GPS to enforce automatic geofence lock
+  // Automatically acquire and monitor live device GPS to enforce automatic geofence lock (when not in demo simulation)
   useEffect(() => {
+    if (isDemoMode) return;
     if (!navigator.geolocation) return;
 
     let watchId: number | null = null;
@@ -104,7 +117,7 @@ export const TeacherDashboard: React.FC = () => {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, []);
+  }, [isDemoMode]);
 
   // Haversine formula to compute distance in meters
   const computeDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -125,13 +138,13 @@ export const TeacherDashboard: React.FC = () => {
   // Re-calculate distance whenever coordinates or school settings change
   useEffect(() => {
     const dist = computeDistance(
-      currentCoords.lat,
-      currentCoords.lng,
+      effectiveCoords.lat,
+      effectiveCoords.lng,
       schoolSettings.schoolLatitude,
       schoolSettings.schoolLongitude
     );
     setDistanceMeters(dist);
-  }, [currentCoords, schoolSettings.schoolLatitude, schoolSettings.schoolLongitude]);
+  }, [effectiveCoords, schoolSettings.schoolLatitude, schoolSettings.schoolLongitude]);
 
   const isWithinCampus = distanceMeters <= schoolSettings.allowedRadiusMeters;
 
@@ -184,8 +197,8 @@ export const TeacherDashboard: React.FC = () => {
       setModalType('early_in');
     } else {
       const res = await clockIn(undefined, false, {
-        latitude: currentCoords.lat,
-        longitude: currentCoords.lng,
+        latitude: effectiveCoords.lat,
+        longitude: effectiveCoords.lng,
       });
       setFeedbackMsg({
         text: res.message,
@@ -236,8 +249,8 @@ export const TeacherDashboard: React.FC = () => {
       setModalType('early_out');
     } else {
       const res = await clockOut(undefined, false, {
-        latitude: currentCoords.lat,
-        longitude: currentCoords.lng,
+        latitude: effectiveCoords.lat,
+        longitude: effectiveCoords.lng,
       });
       setFeedbackMsg({
         text: res.message,
@@ -276,8 +289,8 @@ export const TeacherDashboard: React.FC = () => {
 
     if (modalType === 'early_in') {
       const res = await clockIn(reason, true, {
-        latitude: currentCoords.lat,
-        longitude: currentCoords.lng,
+        latitude: effectiveCoords.lat,
+        longitude: effectiveCoords.lng,
       });
       setFeedbackMsg({
         text: res.message,
@@ -285,8 +298,8 @@ export const TeacherDashboard: React.FC = () => {
       });
     } else if (modalType === 'early_out') {
       const res = await clockOut(reason, true, {
-        latitude: currentCoords.lat,
-        longitude: currentCoords.lng,
+        latitude: effectiveCoords.lat,
+        longitude: effectiveCoords.lng,
       });
       setFeedbackMsg({
         text: res.message,
@@ -324,8 +337,8 @@ export const TeacherDashboard: React.FC = () => {
 
     setBadgeScanning(true);
     const res = await clockInWithBadge(employeeIdOrEmail, {
-      latitude: currentCoords.lat,
-      longitude: currentCoords.lng,
+      latitude: effectiveCoords.lat,
+      longitude: effectiveCoords.lng,
     });
     setBadgeScanning(false);
     setIsBadgeModalOpen(false);
@@ -826,6 +839,99 @@ export const TeacherDashboard: React.FC = () => {
             <span className="truncate">{isWithinCampus ? 'Early Departure Reason' : 'Early Departure (Locked)'}</span>
           </button>
         </div>
+
+        {/* Geofence Demo Simulation Bar */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Radio className={`w-3.5 h-3.5 ${isWithinCampus ? 'text-emerald-600' : 'text-rose-600'}`} />
+                <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                  Demo Location Simulator
+                </span>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                isWithinCampus
+                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                  : 'bg-rose-100 text-rose-900 border border-rose-300'
+              }`}>
+                {isWithinCampus ? 'Within 100m Fence' : 'Outside Boundary'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                id="demo-simulate-in-campus-btn"
+                onClick={() => setSimulationMode('in_campus')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer border ${
+                  simulationStatus === 'in_campus'
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                    : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Simulate In-Campus</span>
+              </button>
+
+              <button
+                type="button"
+                id="demo-simulate-off-campus-btn"
+                onClick={() => setSimulationMode('off_campus')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer border ${
+                  simulationStatus === 'off_campus'
+                    ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                    : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-50'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>Simulate Off-Campus</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+              <span>
+                Simulated: {isWithinCampus ? `Dadaya High Campus (${schoolSettings.schoolLatitude.toFixed(6)}, ${schoolSettings.schoolLongitude.toFixed(6)})` : 'Off-Campus Location (-20.345000, 29.985000)'}
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  id="toggle-campus-map-btn"
+                  onClick={() => setShowCampusMap(!showCampusMap)}
+                  className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <MapIcon className="w-3 h-3" />
+                  <span>{showCampusMap ? 'Hide Google Map' : 'Show Google Map'}</span>
+                </button>
+                {simulationStatus !== 'real_gps' && (
+                  <button
+                    type="button"
+                    onClick={() => setSimulationMode('real_gps')}
+                    className="text-slate-500 underline hover:text-slate-800 font-semibold cursor-pointer"
+                  >
+                    Reset GPS
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Interactive Google Map with Dadaya Geofence & Real-Time Position */}
+        {showCampusMap && (
+          <div className="pt-2">
+            <SchoolCampusMap
+              schoolSettings={schoolSettings}
+              userCoords={{
+                latitude: effectiveCoords.lat,
+                longitude: effectiveCoords.lng,
+              }}
+              isSimulated={simulationStatus !== 'real_gps'}
+              height="280px"
+              title="Live Campus Mapping & Geofence"
+            />
+          </div>
+        )}
       </div>
 
       {/* Teacher Quick Stats in Clean Micro Cards */}

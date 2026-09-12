@@ -105,6 +105,12 @@ interface AppContextType {
   isSchoolDay: (date?: Date) => boolean;
   isWeekend: (date?: Date) => boolean;
   currentDayName: string;
+  isDemoMode: boolean;
+  setDemoMode: (enabled: boolean) => void;
+  demoCoords: { latitude: number; longitude: number };
+  setDemoCoords: (coords: { latitude: number; longitude: number }) => void;
+  setSimulationMode: (mode: 'in_campus' | 'off_campus' | 'real_gps') => void;
+  simulationStatus: 'in_campus' | 'off_campus' | 'real_gps';
 }
 
 const DEFAULT_SETTINGS: SchoolSettings = {
@@ -119,8 +125,8 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   lateGracePeriodMinutes: 15,
   earlyClockInThreshold: '07:15',
   earlyClockOutThreshold: '15:15',
-  schoolLatitude: -20.34049,
-  schoolLongitude: 29.97782,
+  schoolLatitude: -20.334154,
+  schoolLongitude: 29.896333,
   allowedRadiusMeters: 100,
   requireLocation: true,
   lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
@@ -158,6 +164,8 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'dadaya_notifications_v2',
   LEAVE: 'dadaya_leave_requests_v2',
   OFFLINE_QUEUE: 'dadaya_offline_queue_v2',
+  DEMO_MODE: 'dadaya_demo_mode_v2',
+  DEMO_STATUS: 'dadaya_demo_status_v2',
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -272,13 +280,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const msg = parsed.lockMessage
           ? parsed.lockMessage.replace(/800\s*m?/gi, '100m')
           : DEFAULT_SETTINGS.lockMessage;
+        const isOldDefaultLat = parsed.schoolLatitude !== undefined && Math.abs(parsed.schoolLatitude - (-20.34049)) < 0.0001;
+        const isOldDefaultLon = parsed.schoolLongitude !== undefined && Math.abs(parsed.schoolLongitude - 29.97782) < 0.0001;
+        const schoolLatitude = (isOldDefaultLat || parsed.schoolLatitude === undefined) ? -20.334154 : parsed.schoolLatitude;
+        const schoolLongitude = (isOldDefaultLon || parsed.schoolLongitude === undefined) ? 29.896333 : parsed.schoolLongitude;
+
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
           allowedRadiusMeters: radius,
           lockMessage: msg,
-          schoolLatitude: parsed.schoolLatitude ?? -20.34049,
-          schoolLongitude: parsed.schoolLongitude ?? 29.97782,
+          schoolLatitude,
+          schoolLongitude,
         };
       } catch {
         return DEFAULT_SETTINGS;
@@ -302,6 +315,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return 'home';
   });
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile-frame'>('desktop');
+
+  // Simulation mode for Demo: 'real_gps' | 'in_campus' | 'off_campus'
+  const [simulationStatus, setSimulationStatus] = useState<'in_campus' | 'off_campus' | 'real_gps'>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DEMO_STATUS);
+    if (saved === 'in_campus' || saved === 'off_campus' || saved === 'real_gps') {
+      return saved;
+    }
+    return 'real_gps';
+  });
+
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DEMO_MODE);
+    return saved === 'true';
+  });
+
+  // Coordinates for demo:
+  // In-campus: Dadaya High Campus Gate / Center (-20.334154, 29.896333)
+  // Off-campus: Out-of-bounds area (-20.345000, 29.985000) ~10km away
+  const [demoCoords, setDemoCoordsState] = useState<{ latitude: number; longitude: number }>(() => {
+    if (simulationStatus === 'off_campus') {
+      return { latitude: -20.345000, longitude: 29.985000 };
+    }
+    return { latitude: -20.334154, longitude: 29.896333 };
+  });
+
+  const setDemoMode = (enabled: boolean) => {
+    setIsDemoMode(enabled);
+    localStorage.setItem(STORAGE_KEYS.DEMO_MODE, enabled ? 'true' : 'false');
+    if (!enabled) {
+      setSimulationStatus('real_gps');
+      localStorage.setItem(STORAGE_KEYS.DEMO_STATUS, 'real_gps');
+    } else if (simulationStatus === 'real_gps') {
+      setSimulationStatus('in_campus');
+      localStorage.setItem(STORAGE_KEYS.DEMO_STATUS, 'in_campus');
+      setDemoCoordsState({ latitude: schoolSettings.schoolLatitude, longitude: schoolSettings.schoolLongitude });
+    }
+  };
+
+  const setSimulationMode = (mode: 'in_campus' | 'off_campus' | 'real_gps') => {
+    setSimulationStatus(mode);
+    localStorage.setItem(STORAGE_KEYS.DEMO_STATUS, mode);
+    if (mode === 'real_gps') {
+      setIsDemoMode(false);
+      localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'false');
+    } else if (mode === 'in_campus') {
+      setIsDemoMode(true);
+      localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'true');
+      setDemoCoordsState({ latitude: schoolSettings.schoolLatitude, longitude: schoolSettings.schoolLongitude });
+    } else if (mode === 'off_campus') {
+      setIsDemoMode(true);
+      localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'true');
+      // Off-campus coords ~10km outside geofence
+      setDemoCoordsState({ latitude: -20.345000, longitude: 29.985000 });
+    }
+  };
+
+  const setDemoCoords = (coords: { latitude: number; longitude: number }) => {
+    setDemoCoordsState(coords);
+  };
 
   const setActiveView = (view: string) => {
     // Strictly prevent teachers from accessing the admin section
@@ -406,13 +478,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const msg = remoteSettings.lockMessage
               ? remoteSettings.lockMessage.replace(/800\s*m?/gi, '100m')
               : undefined;
+            // If remote had the old hardcoded coordinates (-20.34049, 29.97782), smoothly upgrade to new center
+            const isOldDefaultLat = remoteSettings.schoolLatitude !== undefined && Math.abs(remoteSettings.schoolLatitude - (-20.34049)) < 0.0001;
+            const isOldDefaultLon = remoteSettings.schoolLongitude !== undefined && Math.abs(remoteSettings.schoolLongitude - 29.97782) < 0.0001;
+            const schoolLatitude = (isOldDefaultLat || remoteSettings.schoolLatitude === undefined) ? -20.334154 : remoteSettings.schoolLatitude;
+            const schoolLongitude = (isOldDefaultLon || remoteSettings.schoolLongitude === undefined) ? 29.896333 : remoteSettings.schoolLongitude;
+
             setSchoolSettings((prev) => ({
               ...prev,
               ...remoteSettings,
               allowedRadiusMeters: radius,
               ...(msg ? { lockMessage: msg } : {}),
-              schoolLatitude: remoteSettings.schoolLatitude ?? -20.34049,
-              schoolLongitude: remoteSettings.schoolLongitude ?? 29.97782,
+              schoolLatitude,
+              schoolLongitude,
             }));
           }
         },
@@ -541,14 +619,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const msg = remoteSet.lockMessage
               ? remoteSet.lockMessage.replace(/800\s*m?/gi, '100m')
               : undefined;
+            const isOldDefaultLat = remoteSet.schoolLatitude !== undefined && Math.abs(remoteSet.schoolLatitude - (-20.34049)) < 0.0001;
+            const isOldDefaultLon = remoteSet.schoolLongitude !== undefined && Math.abs(remoteSet.schoolLongitude - 29.97782) < 0.0001;
+            const schoolLatitude = (isOldDefaultLat || remoteSet.schoolLatitude === undefined) ? -20.334154 : remoteSet.schoolLatitude;
+            const schoolLongitude = (isOldDefaultLon || remoteSet.schoolLongitude === undefined) ? 29.896333 : remoteSet.schoolLongitude;
+
             setSchoolSettings((prev) => ({
               ...prev,
               schoolName: remoteSet.schoolName,
               academicYear: remoteSet.academicYear,
               standardClockInTime: remoteSet.standardClockInTime,
               standardClockOutTime: remoteSet.standardClockOutTime,
-              schoolLatitude: remoteSet.schoolLatitude ?? -20.34049,
-              schoolLongitude: remoteSet.schoolLongitude ?? 29.97782,
+              schoolLatitude,
+              schoolLongitude,
               allowedRadiusMeters: radius,
               ...(msg ? { lockMessage: msg } : {}),
             }));
@@ -2157,21 +2240,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Immediate purge of clocked in data as requested
+  // Purge any stale simulation notifications on mount
   useEffect(() => {
-    setAttendanceRecords([]);
-    localStorage.removeItem(STORAGE_KEYS.RECORDS);
-
-    getDocs(collection(db, 'attendance'))
-      .then((snapshot) => {
-        snapshot.docs.forEach((docSnap) => {
-          deleteDoc(doc(db, 'attendance', docSnap.id)).catch(() => null);
-        });
-      })
-      .catch((err) => console.warn('Purge firestore attendance records error:', err));
-
-    fetch('/api/attendance', { method: 'DELETE' }).catch(() => null);
-
     setNotifications((prev) => {
       const cleaned = prev.filter(
         (n) =>
@@ -2259,6 +2329,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSchoolDay,
         isWeekend,
         currentDayName,
+        isDemoMode,
+        setDemoMode,
+        demoCoords,
+        setDemoCoords,
+        setSimulationMode,
+        simulationStatus,
       }}
     >
       {children}

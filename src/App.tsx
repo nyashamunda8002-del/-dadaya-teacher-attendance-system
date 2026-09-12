@@ -126,7 +126,7 @@ const MainAppContent: React.FC = () => {
       <footer className="hidden md:block bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between">
           <p className="font-medium text-slate-600">
-            © {new Date().getFullYear()} Dadaya High School Attendance Management System
+            © {new Date().getFullYear()} Dadaya High Staff Clocking System
           </p>
           <p className="text-xs text-slate-500">
             Created by <span className="font-bold text-emerald-800">Nyasha Munda</span>

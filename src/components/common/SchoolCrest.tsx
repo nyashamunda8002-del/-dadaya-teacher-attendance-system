@@ -238,7 +238,7 @@ export const SchoolCrest: React.FC<SchoolCrestProps> = ({
             Dadaya High School
           </h1>
           <p className="text-[10px] text-emerald-700 font-bold tracking-wide uppercase">
-            Attendance System
+            Staff Clocking System
           </p>
         </div>
       )}

@@ -10,7 +10,7 @@ interface SplashScreenProps {
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   title = 'DADAYA HIGH SCHOOL',
-  subtitle = 'ATTENDANCE SYSTEM',
+  subtitle = 'STAFF CLOCKING SYSTEM',
   role,
 }) => {
   return (

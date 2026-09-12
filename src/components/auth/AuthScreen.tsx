@@ -341,7 +341,7 @@ export const AuthScreen: React.FC = () => {
             Dadaya High School
           </h1>
           <p className="text-xs font-semibold tracking-widest text-emerald-700 uppercase">
-            Attendance System
+            Staff Clocking System
           </p>
         </div>
 
