@@ -1,6 +1,6 @@
 {
-  "name": "Dadaya High Staff Clocking System",
-  "description": "Dadaya High Staff Clocking System with Zimbabwe MoPSE calendar compliance, termly reports, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings.",
+  "name": "Dadaya High School Attendance System",
+  "description": "Dadaya High School Teacher & Admin Attendance System with Zimbabwe MoPSE calendar compliance, termly reports, PDF and Microsoft Access export, background phone notifications, and national public holiday greetings.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

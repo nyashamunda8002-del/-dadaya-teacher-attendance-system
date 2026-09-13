@@ -2,8 +2,8 @@
 
 The geofence uses the configured Dadaya High School coordinates:
 
-- Latitude: -20.334154
-- Longitude: 29.896333
+- Latitude: -20.334688
+- Longitude: 29.895939
 - Allowed radius: 200 metres
 
 ## What was fixed
