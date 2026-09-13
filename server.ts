@@ -252,8 +252,8 @@ async function startServer() {
           lateGracePeriodMinutes: data.lateGracePeriodMinutes || 15,
           earlyClockInThreshold: data.earlyClockInThreshold || '07:15',
           earlyClockOutThreshold: data.earlyClockOutThreshold || '15:15',
-          schoolLatitude: data.schoolLatitude ?? -20.34049,
-          schoolLongitude: data.schoolLongitude ?? 29.97782,
+          schoolLatitude: data.schoolLatitude ?? -20.334287639632716,
+          schoolLongitude: data.schoolLongitude ?? 29.896081746496083,
           allowedRadiusMeters: data.allowedRadiusMeters || 200,
           requireLocation: data.requireLocation ?? true,
           updatedAt: new Date(),
@@ -317,7 +317,7 @@ SCHOOL POLICIES & CONTEXT:
    - Standard Departure / Clock-Out: 03:30 PM (15:30).
    - Early Departure Threshold: 03:15 PM (15:15). Departures before 03:15 PM require an early departure reason.
 3. GPS Geofence Verification:
-   - Campus Coordinates: Latitude -20.34049, Longitude 29.97782.
+   - Campus Coordinates: Latitude -20.334288, Longitude 29.896082.
    - Strict Campus Boundary Radius: 200 meters.
    - Geofence & Active Online Connection are mandatory for all clock-in, clock-out, and badge NFC scans. Offline clocking is strictly prohibited by school policy.
 4. Leave Categories under MoPSE / PSC Regulations:
@@ -512,7 +512,7 @@ You can submit official leave under any of the following statutory categories:
       // Geofence & Location
       else if (lower.includes('geofence') || lower.includes('location') || lower.includes('gps') || lower.includes('radius') || lower.includes('distance') || lower.includes('outside')) {
         message = `### 📍 Campus Geofence Security
-- **Campus Center:** Latitude \`-20.34049\`, Longitude \`29.97782\` (Dadaya High School Main Administration Block).
+- **Campus Center:** Latitude \`-20.334288\`, Longitude \`29.896082\` (Dadaya High School Campus Perimeter).
 - **Approved Radius:** **200 meters**.
 - **Requirement:** Geolocation is verified at the exact moment of clock-in and clock-out to guarantee authentic on-campus presence. Offline clocking is strictly prohibited.`;
         targetView = 'home';

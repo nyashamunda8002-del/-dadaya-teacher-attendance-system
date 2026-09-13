@@ -40,7 +40,6 @@ import {
   getNotificationPermission,
   isNotificationSupported,
 } from '../../utils/phoneNotifications';
-import { SchoolCampusMap } from '../common/SchoolCampusMap';
 
 export const AdminSettings: React.FC = () => {
   const {
@@ -806,28 +805,9 @@ export const AdminSettings: React.FC = () => {
               {saveSuccess && (
                 <div className="mb-4 p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>School details and Google Maps geofence saved successfully!</span>
+                  <span>School details and geofence coordinates saved successfully!</span>
                 </div>
               )}
-
-              {/* Interactive Google Map preview for admin */}
-              <div className="mb-4">
-                <SchoolCampusMap
-                  schoolSettings={{
-                    ...schoolSettings,
-                    schoolLatitude: Number(latitude),
-                    schoolLongitude: Number(longitude),
-                    allowedRadiusMeters: Number(allowedRadius),
-                  }}
-                  onSelectCoordinates={(coords) => {
-                    setLatitude(coords.latitude);
-                    setLongitude(coords.longitude);
-                  }}
-                  height="220px"
-                  title="Campus Geofence Target"
-                  showFenceInfo={true}
-                />
-              </div>
 
               <form onSubmit={handleSaveSchoolInfo} className="space-y-3.5 text-xs">
                 <div>
@@ -859,10 +839,10 @@ export const AdminSettings: React.FC = () => {
                       value={latitude}
                       onChange={(e) => setLatitude(Number(e.target.value))}
                       required
-                      placeholder="-20.334154"
+                      placeholder="-20.334288"
                       className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono"
                     />
-                    <p className="text-[10px] text-gray-400 mt-0.5">20.334154° S = -20.334154</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">-20.334288° S</p>
                   </div>
                   <div>
                     <label className="font-semibold text-gray-700 block mb-1">Longitude (°E positive)</label>
@@ -872,10 +852,10 @@ export const AdminSettings: React.FC = () => {
                       value={longitude}
                       onChange={(e) => setLongitude(Number(e.target.value))}
                       required
-                      placeholder="29.896333"
+                      placeholder="29.896082"
                       className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono"
                     />
-                    <p className="text-[10px] text-gray-400 mt-0.5">29.896333° E = 29.896333</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">29.896082° E</p>
                   </div>
                 </div>
                 <div>

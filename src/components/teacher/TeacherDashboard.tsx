@@ -22,12 +22,10 @@ import {
   ChevronRight,
   UserCheck,
   WifiOff,
-  Map as MapIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EarlyClockModal } from './EarlyClockModal';
 import { evaluateAttendanceEligibility } from '../../utils/zimbabweCalendar';
-import { SchoolCampusMap } from '../common/SchoolCampusMap';
 
 export const TeacherDashboard: React.FC = () => {
   const {
@@ -67,7 +65,6 @@ export const TeacherDashboard: React.FC = () => {
     lng: schoolSettings.schoolLongitude,
   });
   const [distanceMeters, setDistanceMeters] = useState<number>(0);
-  const [showCampusMap, setShowCampusMap] = useState<boolean>(true);
 
   // Active coordinates used for attendance: If in demo mode, use demoCoords; else use live GPS
   const effectiveCoords = isDemoMode
@@ -840,98 +837,16 @@ export const TeacherDashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Geofence Demo Simulation Bar */}
-        <div className="pt-2 border-t border-slate-100">
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Radio className={`w-3.5 h-3.5 ${isWithinCampus ? 'text-emerald-600' : 'text-rose-600'}`} />
-                <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
-                  Demo Location Simulator
-                </span>
-              </div>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                isWithinCampus
-                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                  : 'bg-rose-100 text-rose-900 border border-rose-300'
-              }`}>
-                {isWithinCampus ? 'Within 100m Fence' : 'Outside Boundary'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                id="demo-simulate-in-campus-btn"
-                onClick={() => setSimulationMode('in_campus')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer border ${
-                  simulationStatus === 'in_campus'
-                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                    : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Simulate In-Campus</span>
-              </button>
-
-              <button
-                type="button"
-                id="demo-simulate-off-campus-btn"
-                onClick={() => setSimulationMode('off_campus')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer border ${
-                  simulationStatus === 'off_campus'
-                    ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
-                    : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-50'
-                }`}
-              >
-                <Radio className="w-3.5 h-3.5" />
-                <span>Simulate Off-Campus</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
-              <span>
-                Simulated: {isWithinCampus ? `Dadaya High Campus (${schoolSettings.schoolLatitude.toFixed(6)}, ${schoolSettings.schoolLongitude.toFixed(6)})` : 'Off-Campus Location (-20.345000, 29.985000)'}
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  id="toggle-campus-map-btn"
-                  onClick={() => setShowCampusMap(!showCampusMap)}
-                  className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <MapIcon className="w-3 h-3" />
-                  <span>{showCampusMap ? 'Hide Google Map' : 'Show Google Map'}</span>
-                </button>
-                {simulationStatus !== 'real_gps' && (
-                  <button
-                    type="button"
-                    onClick={() => setSimulationMode('real_gps')}
-                    className="text-slate-500 underline hover:text-slate-800 font-semibold cursor-pointer"
-                  >
-                    Reset GPS
-                  </button>
-                )}
-              </div>
-            </div>
+        {/* Geofence Status Indicator */}
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 text-slate-600 font-medium text-[11px]">
+            <span className={`w-2 h-2 rounded-full ${isWithinCampus ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span>{isWithinCampus ? 'Within Campus Geofence' : 'Outside Campus Boundary'}</span>
           </div>
+          <span className="text-[10px] text-slate-400 font-mono">
+            {isWithinCampus ? 'GPS Verified' : `${distanceMeters}m away`}
+          </span>
         </div>
-
-        {/* Live Interactive Google Map with Dadaya Geofence & Real-Time Position */}
-        {showCampusMap && (
-          <div className="pt-2">
-            <SchoolCampusMap
-              schoolSettings={schoolSettings}
-              userCoords={{
-                latitude: effectiveCoords.lat,
-                longitude: effectiveCoords.lng,
-              }}
-              isSimulated={simulationStatus !== 'real_gps'}
-              height="280px"
-              title="Live Campus Mapping & Geofence"
-            />
-          </div>
-        )}
       </div>
 
       {/* Teacher Quick Stats in Clean Micro Cards */}

@@ -125,8 +125,8 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   lateGracePeriodMinutes: 15,
   earlyClockInThreshold: '07:15',
   earlyClockOutThreshold: '15:15',
-  schoolLatitude: -20.334154,
-  schoolLongitude: 29.896333,
+  schoolLatitude: -20.334287639632716,
+  schoolLongitude: 29.896081746496083,
   allowedRadiusMeters: 100,
   requireLocation: true,
   lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
@@ -280,10 +280,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const msg = parsed.lockMessage
           ? parsed.lockMessage.replace(/800\s*m?/gi, '100m')
           : DEFAULT_SETTINGS.lockMessage;
-        const isOldDefaultLat = parsed.schoolLatitude !== undefined && Math.abs(parsed.schoolLatitude - (-20.34049)) < 0.0001;
-        const isOldDefaultLon = parsed.schoolLongitude !== undefined && Math.abs(parsed.schoolLongitude - 29.97782) < 0.0001;
-        const schoolLatitude = (isOldDefaultLat || parsed.schoolLatitude === undefined) ? -20.334154 : parsed.schoolLatitude;
-        const schoolLongitude = (isOldDefaultLon || parsed.schoolLongitude === undefined) ? 29.896333 : parsed.schoolLongitude;
+        const isOldDefaultLat = parsed.schoolLatitude !== undefined && (Math.abs(parsed.schoolLatitude - (-20.34049)) < 0.0001 || Math.abs(parsed.schoolLatitude - (-20.334154)) < 0.0001);
+        const isOldDefaultLon = parsed.schoolLongitude !== undefined && (Math.abs(parsed.schoolLongitude - 29.97782) < 0.0001 || Math.abs(parsed.schoolLongitude - 29.896333) < 0.0001);
+        const schoolLatitude = (isOldDefaultLat || parsed.schoolLatitude === undefined) ? -20.334287639632716 : parsed.schoolLatitude;
+        const schoolLongitude = (isOldDefaultLon || parsed.schoolLongitude === undefined) ? 29.896081746496083 : parsed.schoolLongitude;
 
         return {
           ...DEFAULT_SETTINGS,
@@ -316,28 +316,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile-frame'>('desktop');
 
-  // Simulation mode for Demo: 'real_gps' | 'in_campus' | 'off_campus'
-  const [simulationStatus, setSimulationStatus] = useState<'in_campus' | 'off_campus' | 'real_gps'>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.DEMO_STATUS);
-    if (saved === 'in_campus' || saved === 'off_campus' || saved === 'real_gps') {
-      return saved;
-    }
-    return 'real_gps';
-  });
+  // Simulation mode for GPS: defaults to real live device GPS ('real_gps')
+  const [simulationStatus, setSimulationStatus] = useState<'in_campus' | 'off_campus' | 'real_gps'>('real_gps');
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.DEMO_MODE);
-    return saved === 'true';
-  });
+  // Clean up any stale simulation status in localStorage
+  useEffect(() => {
+    localStorage.removeItem(STORAGE_KEYS.DEMO_STATUS);
+    localStorage.removeItem(STORAGE_KEYS.DEMO_MODE);
+  }, []);
 
-  // Coordinates for demo:
-  // In-campus: Dadaya High Campus Gate / Center (-20.334154, 29.896333)
-  // Off-campus: Out-of-bounds area (-20.345000, 29.985000) ~10km away
-  const [demoCoords, setDemoCoordsState] = useState<{ latitude: number; longitude: number }>(() => {
-    if (simulationStatus === 'off_campus') {
-      return { latitude: -20.345000, longitude: 29.985000 };
-    }
-    return { latitude: -20.334154, longitude: 29.896333 };
+  // Coordinates for demo fallback:
+  // Dadaya High Campus Gate / Center (-20.334287639632716, 29.896081746496083)
+  const [demoCoords, setDemoCoordsState] = useState<{ latitude: number; longitude: number }>({
+    latitude: -20.334287639632716,
+    longitude: 29.896081746496083,
   });
 
   const setDemoMode = (enabled: boolean) => {
@@ -478,11 +471,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const msg = remoteSettings.lockMessage
               ? remoteSettings.lockMessage.replace(/800\s*m?/gi, '100m')
               : undefined;
-            // If remote had the old hardcoded coordinates (-20.34049, 29.97782), smoothly upgrade to new center
-            const isOldDefaultLat = remoteSettings.schoolLatitude !== undefined && Math.abs(remoteSettings.schoolLatitude - (-20.34049)) < 0.0001;
-            const isOldDefaultLon = remoteSettings.schoolLongitude !== undefined && Math.abs(remoteSettings.schoolLongitude - 29.97782) < 0.0001;
-            const schoolLatitude = (isOldDefaultLat || remoteSettings.schoolLatitude === undefined) ? -20.334154 : remoteSettings.schoolLatitude;
-            const schoolLongitude = (isOldDefaultLon || remoteSettings.schoolLongitude === undefined) ? 29.896333 : remoteSettings.schoolLongitude;
+            // If remote had the old hardcoded coordinates, smoothly upgrade to new center
+            const isOldDefaultLat = remoteSettings.schoolLatitude !== undefined && (Math.abs(remoteSettings.schoolLatitude - (-20.34049)) < 0.0001 || Math.abs(remoteSettings.schoolLatitude - (-20.334154)) < 0.0001);
+            const isOldDefaultLon = remoteSettings.schoolLongitude !== undefined && (Math.abs(remoteSettings.schoolLongitude - 29.97782) < 0.0001 || Math.abs(remoteSettings.schoolLongitude - 29.896333) < 0.0001);
+            const schoolLatitude = (isOldDefaultLat || remoteSettings.schoolLatitude === undefined) ? -20.334287639632716 : remoteSettings.schoolLatitude;
+            const schoolLongitude = (isOldDefaultLon || remoteSettings.schoolLongitude === undefined) ? 29.896081746496083 : remoteSettings.schoolLongitude;
 
             setSchoolSettings((prev) => ({
               ...prev,
@@ -619,10 +612,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const msg = remoteSet.lockMessage
               ? remoteSet.lockMessage.replace(/800\s*m?/gi, '100m')
               : undefined;
-            const isOldDefaultLat = remoteSet.schoolLatitude !== undefined && Math.abs(remoteSet.schoolLatitude - (-20.34049)) < 0.0001;
-            const isOldDefaultLon = remoteSet.schoolLongitude !== undefined && Math.abs(remoteSet.schoolLongitude - 29.97782) < 0.0001;
-            const schoolLatitude = (isOldDefaultLat || remoteSet.schoolLatitude === undefined) ? -20.334154 : remoteSet.schoolLatitude;
-            const schoolLongitude = (isOldDefaultLon || remoteSet.schoolLongitude === undefined) ? 29.896333 : remoteSet.schoolLongitude;
+            const isOldDefaultLat = remoteSet.schoolLatitude !== undefined && (Math.abs(remoteSet.schoolLatitude - (-20.34049)) < 0.0001 || Math.abs(remoteSet.schoolLatitude - (-20.334154)) < 0.0001);
+            const isOldDefaultLon = remoteSet.schoolLongitude !== undefined && (Math.abs(remoteSet.schoolLongitude - 29.97782) < 0.0001 || Math.abs(remoteSet.schoolLongitude - 29.896333) < 0.0001);
+            const schoolLatitude = (isOldDefaultLat || remoteSet.schoolLatitude === undefined) ? -20.334287639632716 : remoteSet.schoolLatitude;
+            const schoolLongitude = (isOldDefaultLon || remoteSet.schoolLongitude === undefined) ? 29.896081746496083 : remoteSet.schoolLongitude;
 
             setSchoolSettings((prev) => ({
               ...prev,

@@ -1,7 +1,7 @@
 {
-  "name": "Dadaya High School Attendance",
-  "short_name": "Dadaya Attendance",
-  "description": "Dadaya High School Official Teacher & Admin Attendance System Android App",
+  "name": "Dadaya High Staff Clocking System",
+  "short_name": "Dadaya Staff Clocking",
+  "description": "Dadaya High School Official Staff Clocking System Android App",
   "id": "org.dadayahighschool.attendance",
   "start_url": "/",
   "scope": "/",

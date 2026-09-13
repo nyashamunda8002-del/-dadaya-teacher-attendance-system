@@ -90,11 +90,11 @@ self.addEventListener('push', (event) => {
         vibrate: [200, 100, 200],
         data: data.data || { url: '/' },
       };
-      event.waitUntil(self.registration.showNotification(data.title || 'Dadaya Attendance', options));
+      event.waitUntil(self.registration.showNotification(data.title || 'Dadaya Staff Clocking', options));
     } catch {
       const text = event.data.text();
       event.waitUntil(
-        self.registration.showNotification('Dadaya Attendance', {
+        self.registration.showNotification('Dadaya Staff Clocking', {
           body: text,
           icon: '/pwa-192x192.png',
         })

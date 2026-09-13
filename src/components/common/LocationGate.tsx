@@ -270,42 +270,11 @@ export const LocationGate: React.FC<LocationGateProps> = ({ children, onLocation
           <button
             type="button"
             onClick={() => setShowInstructions(!showInstructions)}
-            className="text-xs text-slate-400 hover:text-slate-200 underline flex items-center justify-center gap-1 mx-auto"
+            className="text-xs text-slate-400 hover:text-slate-200 underline flex items-center justify-center gap-1 mx-auto pt-2"
           >
             <Info className="w-3.5 h-3.5" />
             <span>{showInstructions ? 'Hide Instructions' : 'How to enable location on your phone/browser'}</span>
           </button>
-
-          {/* Location Simulator Quick Launch for Demo & Evaluations */}
-          <div className="pt-3 border-t border-slate-700/60">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-2">
-              Demo Geofence Simulation
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSimulationMode('in_campus');
-                  triggerHaptic('success');
-                }}
-                className="py-2.5 px-3 rounded-xl bg-emerald-900/60 hover:bg-emerald-800/80 border border-emerald-500/40 text-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Simulate On-Campus</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSimulationMode('off_campus');
-                  triggerHaptic('medium');
-                }}
-                className="py-2.5 px-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Radio className="w-3.5 h-3.5 text-rose-400" />
-                <span>Simulate Off-Campus</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Step-by-step instructions accordion */}
