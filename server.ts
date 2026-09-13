@@ -308,7 +308,7 @@ async function startServer() {
 You possess deep pedagogical and administrative expertise in Zimbabwean Ministry of Primary and Secondary Education (MoPSE) guidelines, school term calendars, Public Service Commission attendance protocols, geofencing rules, and school operations.
 
 SCHOOL POLICIES & CONTEXT:
-1. School Identity: Dadaya High School, Zvishavane District, Midlands Province, Zimbabwe. Motto: "To Strive and To Succeed".
+1. School Identity & System Authorship: Dadaya High School, Zvishavane District, Midlands Province, Zimbabwe. Motto: "To Strive and To Succeed". This system was programmed and developed by Gunda Technologies, led by Chief Technology Officer Nyasha Munda.
 2. School Schedule & Hours:
    - Operating Days: Monday to Friday (Strictly No School Attendance on Weekends or Public Holidays).
    - Standard Arrival / Clock-In: 07:30 AM.
@@ -547,6 +547,14 @@ You can submit official leave under any of the following statutory categories:
         targetView = 'profile';
         actionTitle = 'View Teacher ID Badge';
         suggestedQuestions = ['How do I clock in with my NFC badge?', 'How do I update my profile?'];
+      }
+      // System Authorship & Development Details
+      else if (lower.includes('who made') || lower.includes('who programmed') || lower.includes('who built') || lower.includes('developer') || lower.includes('gunda') || lower.includes('nyasha')) {
+        message = `### 🏢 System Development & Authorship
+The **Dadaya High Staff Clocking System** was engineered and programmed by **Gunda Technologies**, directed by Chief Technology Officer **Nyasha Munda**.`;
+        targetView = 'profile';
+        actionTitle = 'View System & Profile Details';
+        suggestedQuestions = ['What are the school operating hours?', 'How does GPS geofencing work?'];
       }
 
       res.json({

@@ -122,14 +122,14 @@ const MainAppContent: React.FC = () => {
       {/* Floating AI Navigation Assistant for Teachers & Staff */}
       <TeacherAiAssistant />
 
-      {/* Global Desktop Footer */}
-      <footer className="hidden md:block bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-between">
-          <p className="font-medium text-slate-600">
+      {/* Global Application Footer */}
+      <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 mb-16 md:mb-0">
+        <div className="max-w-5xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-1.5">
+          <p className="font-medium text-slate-600 text-[11px] sm:text-xs">
             © {new Date().getFullYear()} Dadaya High Staff Clocking System
           </p>
-          <p className="text-xs text-slate-500">
-            Created by <span className="font-bold text-emerald-800">Nyasha Munda</span>
+          <p className="text-[11px] sm:text-xs text-slate-500">
+            Programmed by <strong className="font-bold text-slate-800">Gunda Technologies</strong> & Chief Technology Officer <strong className="font-bold text-emerald-800">Nyasha Munda</strong>
           </p>
         </div>
       </footer>

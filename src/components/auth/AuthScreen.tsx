@@ -1001,11 +1001,12 @@ export const AuthScreen: React.FC = () => {
         </div>
 
         {/* Auth Page Footer Signature */}
-        <div className="mt-6 text-center select-none">
-          <p className="text-xs text-slate-500 flex items-center justify-center gap-1.5 font-medium">
-            <span>Dadaya High School Attendance Portal</span>
-            <span>•</span>
-            <span>Created by <strong className="text-emerald-800 font-bold">Nyasha Munda</strong></span>
+        <div className="mt-6 text-center select-none space-y-1">
+          <p className="text-xs text-slate-500 font-medium">
+            Dadaya High School Attendance Portal
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Programmed by <strong className="text-slate-700 font-bold">Gunda Technologies</strong> & Chief Technology Officer <strong className="text-emerald-800 font-bold">Nyasha Munda</strong>
           </p>
         </div>
       </div>

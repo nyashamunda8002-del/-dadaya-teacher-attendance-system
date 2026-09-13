@@ -403,7 +403,8 @@ export const TeacherProfile: React.FC = () => {
 
               <div className="bg-slate-50 p-4 rounded-2xl text-xs text-gray-600 text-left space-y-2 border border-slate-100">
                 <p><strong>System:</strong> Dadaya High Staff Clocking System</p>
-                <p><strong>Developer / Author:</strong> <span className="font-bold text-emerald-800">Nyasha Munda</span></p>
+                <p><strong>Software Engineering:</strong> <span className="font-bold text-slate-800">Gunda Technologies</span></p>
+                <p><strong>Chief Technology Officer:</strong> <span className="font-bold text-emerald-800">Nyasha Munda</span></p>
                 <p><strong>Institution:</strong> Dadaya High School, Zvishavane, Zimbabwe</p>
                 <p><strong>Capabilities:</strong> Real-time GPS verification, Cloud SQL synchronization, Early departure admin alerts, and automated attendance reporting.</p>
               </div>

@@ -552,9 +552,9 @@ export const AdminSettings: React.FC = () => {
         </button>
 
         {/* System Authorship & Attribution Card */}
-        <div className="pt-4 border-t border-slate-100 px-4 py-3 flex items-center justify-between text-xs text-slate-500">
+        <div className="pt-4 border-t border-slate-100 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-slate-500">
           <span>Dadaya High School Attendance Portal</span>
-          <span>Created by <strong className="text-emerald-800 font-bold">Nyasha Munda</strong></span>
+          <span>Programmed by <strong className="text-slate-800 font-bold">Gunda Technologies</strong> • Chief Technology Officer <strong className="text-emerald-800 font-bold">Nyasha Munda</strong></span>
         </div>
       </div>
 

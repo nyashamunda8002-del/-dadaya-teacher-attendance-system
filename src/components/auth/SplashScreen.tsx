@@ -76,9 +76,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
             Preparing your dashboard
           </p>
 
-          <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-medium">
-            <span>Created by</span>
-            <span className="font-bold text-emerald-800">Nyasha Munda</span>
+          <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col items-center justify-center gap-0.5 text-[11px] text-slate-400">
+            <span>Programmed by <strong className="text-slate-700 font-bold">Gunda Technologies</strong></span>
+            <span>Chief Technology Officer <strong className="text-emerald-800 font-bold">Nyasha Munda</strong></span>
           </div>
         </div>
       </motion.div>
