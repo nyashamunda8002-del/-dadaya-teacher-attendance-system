@@ -50,7 +50,8 @@ export const TeacherDashboard: React.FC = () => {
   const isOffline = !isOnline || (typeof navigator !== 'undefined' && !navigator.onLine);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const eligibility = evaluateAttendanceEligibility(currentTime, schoolSettings);
-  const isTodayWeekend = eligibility.statusType === 'weekend';
+  const dayOfWeek = currentTime.getDay();
+  const isTodayWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   const isTodayHoliday = eligibility.statusType === 'public_holiday';
   const isOutsideTerm = eligibility.statusType === 'outside_term';
   const todayDayName = currentTime.toLocaleDateString('en-US', { weekday: 'long' });
@@ -580,42 +581,29 @@ export const TeacherDashboard: React.FC = () => {
                 <span>Attendance Inactive (School Term Break)</span>
               </button>
             </div>
-          ) : isTodayWeekend ? (
-            <div className="space-y-3">
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3 text-xs text-slate-800 shadow-2xs">
-                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
-                  <CalendarDays className="w-5 h-5 text-amber-700" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="font-bold text-slate-900 text-xs">
-                      Weekend — School Closed
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-200">
-                      {todayDayName} (Weekend)
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-snug mt-1">
-                    Dadaya High School attendance operates strictly on official school days (Monday to Friday, 07:00 – 16:30). The attendance clock is resting today.
-                  </p>
-                  <p className="text-[10px] text-emerald-800 font-semibold mt-1">
-                    • Next active session: Monday at 07:00 AM
-                  </p>
-                </div>
-              </div>
-
-              <button
-                id="weekend-inactive-btn"
-                type="button"
-                disabled
-                className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs tracking-wide bg-slate-100 border border-slate-200 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <CalendarDays className="w-4 h-4 text-slate-400" />
-                <span>Attendance Inactive (School Closed on Weekends)</span>
-              </button>
-            </div>
           ) : (
             <>
+              {isTodayWeekend && (
+                <div className="mb-3 p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl flex items-start gap-3 text-xs text-emerald-950 shadow-2xs">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <CalendarDays className="w-4 h-4 text-emerald-800" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="font-extrabold text-emerald-950 text-xs">
+                        Weekend Session Active
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900 border border-emerald-300">
+                        {todayDayName} (Weekend Clocking Enabled)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-snug mt-1">
+                      Weekend duty & extra-curricular attendance recording is active today for Dadaya High School faculty.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {isOffline ? (
                 <div className="mb-3 p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3 text-xs text-amber-950 shadow-2xs">
                   <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">

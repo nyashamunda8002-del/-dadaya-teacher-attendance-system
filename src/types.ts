@@ -113,6 +113,7 @@ export interface SchoolSettings {
   allowedRadiusMeters: number; // 100 meters
   requireLocation: boolean;
   lockMessage?: string;
+  allowWeekendClocking?: boolean;
   soundEffectsEnabled?: boolean;
   phoneNotificationsEnabled?: boolean;
 }

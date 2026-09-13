@@ -102,6 +102,7 @@ export const AdminSettings: React.FC = () => {
     setTermEndDate(schoolSettings.termEndDate || '2026-04-10');
     setTermNotes(schoolSettings.termNotes || 'First Term 2026 - Academic & Co-curricular sessions');
     setNotificationPerm(getNotificationPermission());
+    setAllowWeekend(schoolSettings.allowWeekendClocking ?? true);
   }, [schoolSettings]);
 
   // Attendance rules form
@@ -110,6 +111,7 @@ export const AdminSettings: React.FC = () => {
   const [lateGrace, setLateGrace] = useState(schoolSettings.lateGracePeriodMinutes);
   const [earlyInThreshold, setEarlyInThreshold] = useState(schoolSettings.earlyClockInThreshold);
   const [earlyOutThreshold, setEarlyOutThreshold] = useState(schoolSettings.earlyClockOutThreshold);
+  const [allowWeekend, setAllowWeekend] = useState(schoolSettings.allowWeekendClocking ?? true);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -171,6 +173,7 @@ export const AdminSettings: React.FC = () => {
       lateGracePeriodMinutes: Number(lateGrace),
       earlyClockInThreshold: earlyInThreshold,
       earlyClockOutThreshold: earlyOutThreshold,
+      allowWeekendClocking: allowWeekend,
     });
     setSaveSuccess(true);
     setTimeout(() => {
@@ -983,6 +986,24 @@ export const AdminSettings: React.FC = () => {
                     className="w-full p-2 bg-slate-50 border border-gray-200 rounded-xl"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">Arrivals past {clockInTime} + {lateGrace}m are marked Late.</p>
+                </div>
+
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div>
+                      <span className="font-semibold text-gray-800 block text-xs">Allow Weekend Clocking</span>
+                      <span className="text-[11px] text-gray-500 block">Permit teachers to record attendance on Saturdays and Sundays</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer ml-3">
+                      <input
+                        type="checkbox"
+                        checked={allowWeekend}
+                        onChange={(e) => setAllowWeekend(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-3">

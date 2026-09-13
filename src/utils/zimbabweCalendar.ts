@@ -351,6 +351,7 @@ export function evaluateAttendanceEligibility(
     termStartDate?: string;
     termEndDate?: string;
     academicYear?: string;
+    allowWeekendClocking?: boolean;
   }
 ): {
   canClock: boolean;
@@ -367,7 +368,10 @@ export function evaluateAttendanceEligibility(
   const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
 
   // 1. Weekend check (Saturday=6, Sunday=0)
-  if (day === 0 || day === 6) {
+  const isWeekendDay = day === 0 || day === 6;
+  const allowWeekend = customSettings?.allowWeekendClocking ?? true;
+
+  if (isWeekendDay && !allowWeekend) {
     return {
       canClock: false,
       reason: `School is closed today (${dayName} - Weekend). Attendance is only recorded on school days (Monday to Friday).`,

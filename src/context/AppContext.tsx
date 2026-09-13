@@ -130,6 +130,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   allowedRadiusMeters: 100,
   requireLocation: true,
   lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
+  allowWeekendClocking: true,
   soundEffectsEnabled: true,
   phoneNotificationsEnabled: true,
 };
@@ -1179,10 +1180,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Math.round(R * c);
   };
 
-  // Helper: School days (Monday=1 through Friday=5) vs Weekend (Saturday=6, Sunday=0)
+  // Helper: School days (Monday=1 through Friday=5, plus Saturday=6 and Sunday=0 if weekend clocking is allowed)
   const isSchoolDay = (date: Date = new Date()): boolean => {
     const day = date.getDay();
-    return day >= 1 && day <= 5; // Monday to Friday
+    if (day >= 1 && day <= 5) return true;
+    return schoolSettings.allowWeekendClocking ?? true;
   };
 
   const isWeekend = (date: Date = new Date()): boolean => {
