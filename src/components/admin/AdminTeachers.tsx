@@ -16,10 +16,12 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { User } from '../../types';
+import { AdminClassAllocation } from './AdminClassAllocation';
 
 export const AdminTeachers: React.FC = () => {
   const { users, attendanceRecords, addTeacherByAdmin, deleteTeacher } = useApp();
 
+  const [activeTab, setActiveTab] = useState<'directory' | 'class_allocations'>('directory');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<User | null>(null);
@@ -71,8 +73,39 @@ export const AdminTeachers: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* Header matching Wireframe screen #5 (All Teachers) */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
+      {/* Subtab Switcher */}
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-1.5">
+        <button
+          onClick={() => setActiveTab('directory')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'directory'
+              ? 'bg-blue-800 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Faculty & Teachers Directory</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('class_allocations')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'class_allocations'
+              ? 'bg-blue-800 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span>Class Allocations to Teachers</span>
+        </button>
+      </div>
+
+      {activeTab === 'class_allocations' ? (
+        <AdminClassAllocation />
+      ) : (
+        <div className="space-y-6">
+          {/* Header matching Wireframe screen #5 (All Teachers) */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Faculty & Teachers Directory</h2>
@@ -261,6 +294,8 @@ export const AdminTeachers: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 };

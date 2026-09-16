@@ -103,6 +103,7 @@ export const AdminSettings: React.FC = () => {
     setTermNotes(schoolSettings.termNotes || 'First Term 2026 - Academic & Co-curricular sessions');
     setNotificationPerm(getNotificationPermission());
     setAllowWeekend(schoolSettings.allowWeekendClocking ?? true);
+    setAutoClockIn(schoolSettings.autoClockInGeofence ?? true);
   }, [schoolSettings]);
 
   // Attendance rules form
@@ -112,6 +113,7 @@ export const AdminSettings: React.FC = () => {
   const [earlyInThreshold, setEarlyInThreshold] = useState(schoolSettings.earlyClockInThreshold);
   const [earlyOutThreshold, setEarlyOutThreshold] = useState(schoolSettings.earlyClockOutThreshold);
   const [allowWeekend, setAllowWeekend] = useState(schoolSettings.allowWeekendClocking ?? true);
+  const [autoClockIn, setAutoClockIn] = useState(schoolSettings.autoClockInGeofence ?? true);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -174,6 +176,7 @@ export const AdminSettings: React.FC = () => {
       earlyClockInThreshold: earlyInThreshold,
       earlyClockOutThreshold: earlyOutThreshold,
       allowWeekendClocking: allowWeekend,
+      autoClockInGeofence: autoClockIn,
     });
     setSaveSuccess(true);
     setTimeout(() => {
@@ -988,7 +991,7 @@ export const AdminSettings: React.FC = () => {
                   <p className="text-[10px] text-gray-400 mt-1">Arrivals past {clockInTime} + {lateGrace}m are marked Late.</p>
                 </div>
 
-                <div className="pt-2 border-t border-gray-100">
+                <div className="pt-2 border-t border-gray-100 space-y-2.5">
                   <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
                     <div>
                       <span className="font-semibold text-gray-800 block text-xs">Allow Weekend Clocking</span>
@@ -999,6 +1002,27 @@ export const AdminSettings: React.FC = () => {
                         type="checkbox"
                         checked={allowWeekend}
                         onChange={(e) => setAllowWeekend(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-emerald-950 block text-xs">Automatic Geofence Clock-In</span>
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-200 text-emerald-900 uppercase">
+                          Clock-In Only
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-emerald-800 block mt-0.5">Automatically clocks in teachers the instant they enter Dadaya High School campus (Clock-out remains manual for security)</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer ml-3">
+                      <input
+                        type="checkbox"
+                        checked={autoClockIn}
+                        onChange={(e) => setAutoClockIn(e.target.checked)}
                         className="sr-only peer"
                       />
                       <div className="w-10 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>

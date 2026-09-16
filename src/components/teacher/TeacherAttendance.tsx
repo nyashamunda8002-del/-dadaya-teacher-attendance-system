@@ -9,11 +9,15 @@ import {
   AlertTriangle,
   XCircle,
   TrendingUp,
+  GraduationCap,
+  UserCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { TeacherStudentAttendance } from './TeacherStudentAttendance';
 
 export const TeacherAttendance: React.FC = () => {
-  const { currentUser, attendanceRecords } = useApp();
+  const { currentUser, attendanceRecords, selectedTeacherClass } = useApp();
+  const [subTab, setSubTab] = useState<'student_roll_call' | 'teacher_timesheet'>('student_roll_call');
   const [selectedMonthOffset, setSelectedMonthOffset] = useState(0);
 
   const currentDate = new Date();
@@ -71,103 +75,137 @@ export const TeacherAttendance: React.FC = () => {
       : '03:35 PM';
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      {/* Date Range Navigation Header */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">My Attendance</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Monthly overview & performance indicators for {currentUser?.name} {currentUser?.surname}
-            </p>
-          </div>
+    <div className="max-w-4xl mx-auto space-y-5 pb-12">
+      {/* Top Segmented Sub-Tab Switcher */}
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-1.5">
+        <button
+          onClick={() => setSubTab('student_roll_call')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+            subTab === 'student_roll_call'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span>Student Class Attendance {selectedTeacherClass ? `(${selectedTeacherClass})` : ''}</span>
+        </button>
 
-          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl">
-            <button
-              onClick={() => setSelectedMonthOffset((prev) => prev - 1)}
-              className="p-1.5 rounded-xl hover:bg-white text-slate-700 transition"
-              title="Previous Month"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-1.5 px-2 text-xs font-bold text-slate-800">
-              <CalendarIcon className="w-3.5 h-3.5 text-emerald-700" />
-              <span>{monthName}</span>
+        <button
+          onClick={() => setSubTab('teacher_timesheet')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+            subTab === 'teacher_timesheet'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <UserCheck className="w-4 h-4" />
+          <span>My Teacher Clocking Timesheet</span>
+        </button>
+      </div>
+
+      {/* Render selected tab content */}
+      {subTab === 'student_roll_call' ? (
+        <TeacherStudentAttendance />
+      ) : (
+        <div className="space-y-6">
+          {/* Date Range Navigation Header */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">My Teacher Attendance</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Monthly clock-in performance for {currentUser?.name} {currentUser?.surname}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl">
+                <button
+                  onClick={() => setSelectedMonthOffset((prev) => prev - 1)}
+                  className="p-1.5 rounded-xl hover:bg-white text-slate-700 transition"
+                  title="Previous Month"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-1.5 px-2 text-xs font-bold text-slate-800">
+                  <CalendarIcon className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>{monthName}</span>
+                </div>
+                <button
+                  onClick={() => setSelectedMonthOffset((prev) => prev + 1)}
+                  className="p-1.5 rounded-xl hover:bg-white text-slate-700 transition"
+                  title="Next Month"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setSelectedMonthOffset((prev) => prev + 1)}
-              className="p-1.5 rounded-xl hover:bg-white text-slate-700 transition"
-              title="Next Month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+
+            {/* Status Metrics Cards (Present / Late / Absent) */}
+            <div className="grid grid-cols-3 gap-3 sm:gap-5 mt-6">
+              <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 text-center">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block mb-1">
+                  Present
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-emerald-700">
+                  {presentCount}
+                </span>
+              </div>
+
+              <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 text-center">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
+                  Late
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-amber-700">
+                  {lateCount}
+                </span>
+              </div>
+
+              <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4 text-center">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 block mb-1">
+                  Absent
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-rose-700">
+                  {absentCount}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Analytics Breakdown Card */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-5">
+            <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
+              Monthly Working Summary
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">Total Working Hours</span>
+                <span className="text-lg font-bold font-mono text-emerald-900">{totalHoursStr}</span>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">Average Clock In</span>
+                <span className="text-sm font-bold font-mono text-gray-900">{avgClockInStr}</span>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">Average Clock Out</span>
+                <span className="text-sm font-bold font-mono text-gray-900">{avgClockOutStr}</span>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">Total Late (days)</span>
+                <span className="text-sm font-bold font-mono text-amber-700">{lateCount}</span>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between sm:col-span-2">
+                <span className="text-xs font-semibold text-gray-600">Total Absent (days)</span>
+                <span className="text-sm font-bold font-mono text-rose-700">{absentCount}</span>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Status Metrics Cards (Present / Late / Absent) matching Wireframe */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-5 mt-6">
-          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 text-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block mb-1">
-              Present
-            </span>
-            <span className="text-2xl sm:text-3xl font-black text-emerald-700">
-              {presentCount}
-            </span>
-          </div>
-
-          <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 text-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
-              Late
-            </span>
-            <span className="text-2xl sm:text-3xl font-black text-amber-700">
-              {lateCount}
-            </span>
-          </div>
-
-          <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4 text-center">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 block mb-1">
-              Absent
-            </span>
-            <span className="text-2xl sm:text-3xl font-black text-rose-700">
-              {absentCount}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Analytics Breakdown Card matching Wireframe screen #6 */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-5">
-        <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-          Monthly Working Summary
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-600">Total Working Hours</span>
-            <span className="text-lg font-bold font-mono text-emerald-900">{totalHoursStr}</span>
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-600">Average Clock In</span>
-            <span className="text-sm font-bold font-mono text-gray-900">{avgClockInStr}</span>
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-600">Average Clock Out</span>
-            <span className="text-sm font-bold font-mono text-gray-900">{avgClockOutStr}</span>
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-600">Total Late (days)</span>
-            <span className="text-sm font-bold font-mono text-amber-700">{lateCount}</span>
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between sm:col-span-2">
-            <span className="text-xs font-semibold text-gray-600">Total Absent (days)</span>
-            <span className="text-sm font-bold font-mono text-rose-700">{absentCount}</span>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

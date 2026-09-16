@@ -19,6 +19,8 @@ import {
   LeaveRequest,
   LeaveStatus,
   QueuedOfflineAction,
+  StudentAttendanceRecord,
+  SchoolClass,
 } from '../types';
 import { soundEffects } from '../utils/soundEffects';
 import { sendPhoneNotification, initializeBackgroundNotificationService } from '../utils/phoneNotifications';
@@ -28,6 +30,17 @@ interface AppContextType {
   currentUser: User | null;
   users: User[];
   attendanceRecords: AttendanceRecord[];
+  studentAttendanceRecords: StudentAttendanceRecord[];
+  classes: SchoolClass[];
+  selectedTeacherClass: string;
+  setSelectedTeacherClass: (className: string) => void;
+  saveStudentAttendance: (
+    record: Omit<StudentAttendanceRecord, 'id' | 'timestamp' | 'createdAt'>
+  ) => Promise<{ success: boolean; message: string; record?: StudentAttendanceRecord }>;
+  deleteStudentAttendance: (id: string) => Promise<void>;
+  allocateClassesToTeacher: (teacherId: string, classNames: string[]) => Promise<{ success: boolean; message: string }>;
+  saveSchoolClass: (cls: SchoolClass) => Promise<{ success: boolean; message: string }>;
+  deleteSchoolClass: (id: string) => Promise<void>;
   notifications: EarlyClockNotification[];
   leaveRequests: LeaveRequest[];
   schoolSettings: SchoolSettings;
@@ -131,6 +144,7 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   requireLocation: true,
   lockMessage: 'Attendance clocking is locked: You are outside Dadaya High School campus. You must be physically within the 100m school boundary to clock in or clock out.',
   allowWeekendClocking: true,
+  autoClockInGeofence: true,
   soundEffectsEnabled: true,
   phoneNotificationsEnabled: true,
 };
@@ -157,10 +171,115 @@ const DEFAULT_ADMIN_USER: User = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
+export const DEFAULT_CLASSES: SchoolClass[] = [
+  { id: 'cls-1a', name: 'Form 1A', formLevel: 'Form 1', capacity: 45, roomNumber: 'Block A, Rm 1' },
+  { id: 'cls-1b', name: 'Form 1B', formLevel: 'Form 1', capacity: 45, roomNumber: 'Block A, Rm 2' },
+  { id: 'cls-1c', name: 'Form 1C', formLevel: 'Form 1', capacity: 44, roomNumber: 'Block A, Rm 3' },
+  { id: 'cls-2a', name: 'Form 2A', formLevel: 'Form 2', capacity: 45, roomNumber: 'Block B, Rm 1' },
+  { id: 'cls-2b', name: 'Form 2B', formLevel: 'Form 2', capacity: 44, roomNumber: 'Block B, Rm 2' },
+  { id: 'cls-2c', name: 'Form 2C', formLevel: 'Form 2', capacity: 44, roomNumber: 'Block B, Rm 3' },
+  { id: 'cls-3sc', name: 'Form 3 Science', formLevel: 'Form 3', capacity: 42, roomNumber: 'Science Wing Rm 1' },
+  { id: 'cls-3art', name: 'Form 3 Arts', formLevel: 'Form 3', capacity: 45, roomNumber: 'Block C, Rm 1' },
+  { id: 'cls-3comm', name: 'Form 3 Commercials', formLevel: 'Form 3', capacity: 43, roomNumber: 'Block C, Rm 2' },
+  { id: 'cls-4sc', name: 'Form 4 Science', formLevel: 'Form 4', capacity: 40, roomNumber: 'Science Wing Rm 2' },
+  { id: 'cls-4art', name: 'Form 4 Arts', formLevel: 'Form 4', capacity: 44, roomNumber: 'Block C, Rm 3' },
+  { id: 'cls-4comm', name: 'Form 4 Commercials', formLevel: 'Form 4', capacity: 44, roomNumber: 'Block C, Rm 4' },
+  { id: 'cls-l6sc', name: 'Lower 6 Sciences', formLevel: 'Lower 6', capacity: 35, roomNumber: 'Sixth Form Block Rm 1' },
+  { id: 'cls-l6art', name: 'Lower 6 Arts', formLevel: 'Lower 6', capacity: 38, roomNumber: 'Sixth Form Block Rm 2' },
+  { id: 'cls-u6sc', name: 'Upper 6 Sciences', formLevel: 'Upper 6', capacity: 32, roomNumber: 'Sixth Form Block Rm 3' },
+  { id: 'cls-u6art', name: 'Upper 6 Arts', formLevel: 'Upper 6', capacity: 36, roomNumber: 'Sixth Form Block Rm 4' },
+];
+
+export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
+  {
+    id: 'att-demo-1a',
+    className: 'Form 1A',
+    teacherId: 'tch-001',
+    teacherName: 'Tendai Moyo',
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now() - 7200000,
+    girlsBoarders: 14,
+    girlsDay: 9,
+    boysBoarders: 12,
+    boysDay: 8,
+    actualTotal: 43,
+    possibleTotal: 45,
+    notes: '2 day scholars absent due to transport',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'att-demo-1b',
+    className: 'Form 1B',
+    teacherId: 'tch-002',
+    teacherName: 'Chipo Dube',
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now() - 6800000,
+    girlsBoarders: 15,
+    girlsDay: 8,
+    boysBoarders: 11,
+    boysDay: 9,
+    actualTotal: 43,
+    possibleTotal: 45,
+    notes: 'All boarders present',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'att-demo-3sc',
+    className: 'Form 3 Science',
+    teacherId: 'tch-003',
+    teacherName: 'Blessing Sibanda',
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now() - 5400000,
+    girlsBoarders: 13,
+    girlsDay: 7,
+    boysBoarders: 14,
+    boysDay: 6,
+    actualTotal: 40,
+    possibleTotal: 42,
+    notes: 'Practical physics session',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'att-demo-4sc',
+    className: 'Form 4 Science',
+    teacherId: 'tch-004',
+    teacherName: 'Farai Ncube',
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now() - 3600000,
+    girlsBoarders: 12,
+    girlsDay: 8,
+    boysBoarders: 11,
+    boysDay: 8,
+    actualTotal: 39,
+    possibleTotal: 40,
+    notes: '1 sick in clinic',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'att-demo-u6sc',
+    className: 'Upper 6 Sciences',
+    teacherId: 'tch-005',
+    teacherName: 'Tinashe Zhou',
+    date: new Date().toISOString().split('T')[0],
+    timestamp: Date.now() - 1800000,
+    girlsBoarders: 10,
+    girlsDay: 6,
+    boysBoarders: 9,
+    boysDay: 7,
+    actualTotal: 32,
+    possibleTotal: 32,
+    notes: 'Full attendance',
+    createdAt: new Date().toISOString(),
+  },
+];
+
 const STORAGE_KEYS = {
   CURRENT_USER: 'dadaya_current_user_v2',
   SETTINGS: 'dadaya_school_settings_v2',
   RECORDS: 'dadaya_attendance_records_v2',
+  STUDENT_ATTENDANCE: 'dadaya_student_attendance_v2',
+  CLASSES: 'dadaya_classes_v2',
+  TEACHER_SELECTED_CLASS: 'dadaya_teacher_selected_class_v2',
   USERS: 'dadaya_users_v2',
   NOTIFICATIONS: 'dadaya_notifications_v2',
   LEAVE: 'dadaya_leave_requests_v2',
@@ -300,6 +419,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return DEFAULT_SETTINGS;
   });
+
+  // Student Attendance State
+  const [studentAttendanceRecords, setStudentAttendanceRecords] = useState<StudentAttendanceRecord[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.STUDENT_ATTENDANCE);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return DEFAULT_STUDENT_ATTENDANCE;
+  });
+
+  // School Classes State
+  const [classes, setClasses] = useState<SchoolClass[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CLASSES);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return DEFAULT_CLASSES;
+  });
+
+  // Currently selected/registered class for teacher
+  const [selectedTeacherClass, setSelectedTeacherClassState] = useState<string>(() => {
+    return localStorage.getItem(STORAGE_KEYS.TEACHER_SELECTED_CLASS) || '';
+  });
+
+  const setSelectedTeacherClass = (className: string) => {
+    setSelectedTeacherClassState(className);
+    localStorage.setItem(STORAGE_KEYS.TEACHER_SELECTED_CLASS, className);
+  };
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFirebaseLinked, setIsFirebaseLinked] = useState<boolean>(true);
@@ -510,6 +663,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.warn('Firebase leave requests listener fallback:', error);
         }
       );
+
+      // 6. Listen to Student Daily Attendance in Firebase Firestore
+      const studentAttCol = collection(db, 'student_attendance');
+      onSnapshot(
+        studentAttCol,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreStudentAtt: StudentAttendanceRecord[] = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            } as StudentAttendanceRecord));
+            setStudentAttendanceRecords(firestoreStudentAtt);
+          }
+        },
+        (error) => {
+          console.warn('Firebase student attendance listener fallback:', error);
+        }
+      );
+
+      // 7. Listen to Classes & Allocations in Firebase Firestore
+      const classesCol = collection(db, 'classes');
+      onSnapshot(
+        classesCol,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const firestoreClasses: SchoolClass[] = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            } as SchoolClass));
+            setClasses(firestoreClasses);
+          }
+        },
+        (error) => {
+          console.warn('Firebase classes listener fallback:', error);
+        }
+      );
     } catch (firebaseErr) {
       console.warn('Firebase initialization notice:', firebaseErr);
     }
@@ -677,6 +866,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(schoolSettings));
   }, [schoolSettings]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STUDENT_ATTENDANCE, JSON.stringify(studentAttendanceRecords));
+  }, [studentAttendanceRecords]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
+  }, [classes]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(offlineQueue));
@@ -2007,6 +2204,155 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) => [...prev, newTeacher]);
   };
 
+  // Student Daily Attendance Management
+  const saveStudentAttendance = async (
+    recordData: Omit<StudentAttendanceRecord, 'id' | 'timestamp' | 'createdAt'>
+  ): Promise<{ success: boolean; message: string; record?: StudentAttendanceRecord }> => {
+    try {
+      const gBoarders = Number(recordData.girlsBoarders) || 0;
+      const gDay = Number(recordData.girlsDay) || 0;
+      const bBoarders = Number(recordData.boysBoarders) || 0;
+      const bDay = Number(recordData.boysDay) || 0;
+      const actualTotal = gBoarders + gDay + bBoarders + bDay;
+      const recordId = `att_std_${recordData.className.replace(/[^a-zA-Z0-9]/g, '_')}_${recordData.date}`;
+      const now = new Date().toISOString();
+
+      const newRecord: StudentAttendanceRecord = {
+        ...recordData,
+        id: recordId,
+        girlsBoarders: gBoarders,
+        girlsDay: gDay,
+        boysBoarders: bBoarders,
+        boysDay: bDay,
+        actualTotal,
+        possibleTotal: Number(recordData.possibleTotal) || actualTotal,
+        timestamp: Date.now(),
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      setStudentAttendanceRecords((prev) => {
+        const existingIdx = prev.findIndex(
+          (r) => r.className.toLowerCase() === recordData.className.toLowerCase() && r.date === recordData.date
+        );
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = { ...updated[existingIdx], ...newRecord, updatedAt: now };
+          return updated;
+        }
+        return [newRecord, ...prev];
+      });
+
+      // Save to Firebase Firestore
+      try {
+        await setDoc(doc(db, 'student_attendance', recordId), newRecord);
+      } catch (err) {
+        console.warn('Firestore student attendance sync fallback:', err);
+      }
+
+      soundEffects.playClockInSuccess();
+      return {
+        success: true,
+        message: `Student attendance for ${recordData.className} successfully recorded for ${recordData.date}!`,
+        record: newRecord,
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to record student attendance' };
+    }
+  };
+
+  const deleteStudentAttendance = async (id: string) => {
+    setStudentAttendanceRecords((prev) => prev.filter((r) => r.id !== id));
+    try {
+      await deleteDoc(doc(db, 'student_attendance', id));
+    } catch (err) {
+      console.warn('Firestore delete student attendance notice:', err);
+    }
+  };
+
+  // Class Allocation to Teachers
+  const allocateClassesToTeacher = async (
+    teacherId: string,
+    classNames: string[]
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      const teacher = users.find((u) => u.id === teacherId);
+      const teacherFullName = teacher ? `${teacher.name} ${teacher.surname}` : 'Teacher';
+
+      // 1. Update Teacher User in State
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id === teacherId) {
+            return { ...u, assignedClasses: classNames };
+          }
+          return u;
+        })
+      );
+
+      // If current logged in teacher, update currentUser state
+      if (currentUser?.id === teacherId) {
+        setCurrentUser((prev) => (prev ? { ...prev, assignedClasses: classNames } : null));
+      }
+
+      // 2. Update classes assigned teacher
+      setClasses((prev) =>
+        prev.map((c) => {
+          if (classNames.includes(c.name)) {
+            return { ...c, assignedTeacherId: teacherId, assignedTeacherName: teacherFullName };
+          } else if (c.assignedTeacherId === teacherId) {
+            // Unassign if removed
+            return { ...c, assignedTeacherId: undefined, assignedTeacherName: undefined };
+          }
+          return c;
+        })
+      );
+
+      // Update in Firebase Firestore
+      try {
+        await updateDoc(doc(db, 'users', teacherId), { assignedClasses: classNames });
+      } catch (err) {
+        console.warn('Firestore user class allocation update notice:', err);
+      }
+
+      soundEffects.playClockInSuccess();
+      return {
+        success: true,
+        message: `Classes (${classNames.join(', ') || 'None'}) successfully allocated to ${teacherFullName}!`,
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to allocate classes' };
+    }
+  };
+
+  const saveSchoolClass = async (cls: SchoolClass): Promise<{ success: boolean; message: string }> => {
+    setClasses((prev) => {
+      const idx = prev.findIndex((c) => c.id === cls.id || c.name.toLowerCase() === cls.name.toLowerCase());
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], ...cls };
+        return updated;
+      }
+      return [...prev, cls];
+    });
+
+    try {
+      await setDoc(doc(db, 'classes', cls.id), cls);
+    } catch (err) {
+      console.warn('Firestore class save error:', err);
+    }
+
+    return { success: true, message: `Class ${cls.name} saved successfully.` };
+  };
+
+  const deleteSchoolClass = async (id: string) => {
+    setClasses((prev) => prev.filter((c) => c.id !== id));
+    try {
+      await deleteDoc(doc(db, 'classes', id));
+    } catch (err) {
+      console.warn('Firestore class delete error:', err);
+    }
+  };
+
   const updateSchoolSettings = (newSettings: Partial<SchoolSettings>) => {
     const merged = { ...schoolSettings, ...newSettings };
     setSchoolSettings(merged);
@@ -2279,6 +2625,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         users,
         attendanceRecords,
+        studentAttendanceRecords,
+        classes,
+        selectedTeacherClass,
+        setSelectedTeacherClass,
+        saveStudentAttendance,
+        deleteStudentAttendance,
+        allocateClassesToTeacher,
+        saveSchoolClass,
+        deleteSchoolClass,
         notifications,
         leaveRequests,
         schoolSettings,

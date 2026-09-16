@@ -15,6 +15,7 @@ import { TeacherAttendance } from './components/teacher/TeacherAttendance';
 import { TeacherLeave } from './components/teacher/TeacherLeave';
 import { TeacherReports } from './components/teacher/TeacherReports';
 import { TeacherProfile } from './components/teacher/TeacherProfile';
+import { TeacherStudentAttendance } from './components/teacher/TeacherStudentAttendance';
 
 // Admin Views
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -23,6 +24,8 @@ import { AdminAttendanceReport } from './components/admin/AdminAttendanceReport'
 import { AdminLeaveManagement } from './components/admin/AdminLeaveManagement';
 import { AdminReportsMenu } from './components/admin/AdminReportsMenu';
 import { AdminSettings } from './components/admin/AdminSettings';
+import { AdminStudentAttendance } from './components/admin/AdminStudentAttendance';
+import { AdminClassAllocation } from './components/admin/AdminClassAllocation';
 
 import { LocationGate } from './components/common/LocationGate';
 
@@ -69,6 +72,8 @@ const MainAppContent: React.FC = () => {
           return <TeacherHistory />;
         case 'attendance':
           return <TeacherAttendance />;
+        case 'student-attendance':
+          return <TeacherStudentAttendance />;
         case 'leave':
           return <TeacherLeave />;
         case 'reports':
@@ -87,6 +92,10 @@ const MainAppContent: React.FC = () => {
           return <AdminTeachers />;
         case 'attendance-report':
           return <AdminAttendanceReport />;
+        case 'admin-student-attendance':
+          return <AdminStudentAttendance />;
+        case 'admin-class-allocation':
+          return <AdminClassAllocation />;
         case 'admin-leave':
           return <AdminLeaveManagement />;
         case 'admin-reports':

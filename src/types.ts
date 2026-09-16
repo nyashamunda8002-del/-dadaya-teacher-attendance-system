@@ -15,6 +15,7 @@ export interface User {
   department?: string;
   avatarUrl?: string;
   theme?: ThemeMode;
+  assignedClasses?: string[]; // Classes allocated to teacher e.g. ["Form 1A", "Form 3 Science"]
   createdAt: string;
 }
 
@@ -114,6 +115,7 @@ export interface SchoolSettings {
   requireLocation: boolean;
   lockMessage?: string;
   allowWeekendClocking?: boolean;
+  autoClockInGeofence?: boolean;
   soundEffectsEnabled?: boolean;
   phoneNotificationsEnabled?: boolean;
 }
@@ -150,5 +152,35 @@ export interface MoPSERegisterRow {
   totalWorkingDays: number;
   attendanceRate: number; // e.g. 96.5%
   remarks: string;
+}
+
+export interface StudentAttendanceRecord {
+  id: string;
+  className: string; // e.g. "Form 1A", "Form 4 Science"
+  teacherId: string;
+  teacherName: string;
+  teacherSurname?: string;
+  date: string; // YYYY-MM-DD
+  timestamp: number;
+  girlsBoarders: number;
+  girlsDay: number;
+  boysBoarders: number;
+  boysDay: number;
+  actualTotal: number; // girlsBoarders + girlsDay + boysBoarders + boysDay
+  possibleTotal: number; // Enrolled students in class
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SchoolClass {
+  id: string;
+  name: string; // e.g. "Form 1A", "Form 2B", "Form 3 Science"
+  formLevel: string; // "Form 1", "Form 2", "Form 3", "Form 4", "Lower 6", "Upper 6"
+  capacity: number; // default possible count, e.g. 45
+  assignedTeacherId?: string;
+  assignedTeacherName?: string;
+  roomNumber?: string;
+  notes?: string;
 }
 

@@ -21,10 +21,12 @@ import {
   exportToAccessAndExcelCSV,
 } from '../../utils/reportExport';
 import { triggerHaptic } from '../../utils/haptics';
+import { AdminStudentAttendance } from './AdminStudentAttendance';
 
 export const AdminAttendanceReport: React.FC = () => {
   const { users, attendanceRecords, schoolSettings, clearAttendanceRecords, deleteAttendanceRecord, setActiveView } = useApp();
 
+  const [activeTab, setActiveTab] = useState<'student_register' | 'faculty_attendance'>('student_register');
   const [reportType, setReportType] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>('Daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,8 +106,37 @@ export const AdminAttendanceReport: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* Filters Bar matching wireframe screen #6 */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+      {/* Top Tab Switcher */}
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-1.5">
+        <button
+          onClick={() => setActiveTab('student_register')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'student_register'
+              ? 'bg-emerald-800 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>Daily Student Attendance (MoPSE Headings)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('faculty_attendance')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'faculty_attendance'
+              ? 'bg-emerald-800 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>Faculty Staff Clocking Timesheet</span>
+        </button>
+      </div>
+
+      {activeTab === 'student_register' ? (
+        <AdminStudentAttendance />
+      ) : (
+        <div className="space-y-6">
+          {/* Filters Bar matching wireframe screen #6 */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <SchoolCrest size="sm" />
@@ -370,6 +401,8 @@ export const AdminAttendanceReport: React.FC = () => {
           </div>
         )}
       </div>
+      </div>
+      )}
     </div>
   );
 };

@@ -166,23 +166,98 @@ export async function checkAndSendHolidayGreeting(force: boolean = false): Promi
 }
 
 /**
+ * Checks if clock-in or clock-out is about to happen or is underway,
+ * and sends an alert directly to the teacher's phone.
+ */
+export async function checkAndSendClockingReminder(
+  teacherName?: string,
+  forceType?: 'clock_in' | 'clock_out' | 'manual_test'
+): Promise<{ sent: boolean; reason?: string }> {
+  const now = new Date();
+  const day = now.getDay();
+  // Mon=1 to Fri=5 (or forced)
+  const isSchoolDay = forceType === 'manual_test' || (day >= 1 && day <= 5);
+
+  if (!isSchoolDay) {
+    return { sent: false, reason: 'Not a school day' };
+  }
+
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentTotalMinutes = hours * 60 + minutes;
+  const dateStr = now.toISOString().split('T')[0];
+
+  // Morning window: 06:45 (405m) to 07:45 (465m)
+  // Afternoon window: 16:15 (975m) to 16:45 (1005m)
+  let reminderType: 'clock_in' | 'clock_out' | null = forceType === 'clock_out' ? 'clock_out' : (forceType === 'clock_in' ? 'clock_in' : null);
+
+  if (!reminderType && forceType !== 'manual_test') {
+    if (currentTotalMinutes >= 400 && currentTotalMinutes <= 465) {
+      reminderType = 'clock_in';
+    } else if (currentTotalMinutes >= 970 && currentTotalMinutes <= 1010) {
+      reminderType = 'clock_out';
+    }
+  }
+
+  if (forceType === 'manual_test' && !reminderType) {
+    reminderType = currentTotalMinutes < 720 ? 'clock_in' : 'clock_out';
+  }
+
+  if (!reminderType) {
+    return { sent: false, reason: 'Current time is outside the standard clocking reminder windows' };
+  }
+
+  const storageKey = `dadaya_clock_reminder_${reminderType}_${dateStr}`;
+  if (forceType !== 'manual_test' && typeof localStorage !== 'undefined') {
+    if (localStorage.getItem(storageKey) === 'true') {
+      return { sent: false, reason: 'Already reminded for this session today' };
+    }
+  }
+
+  const greeting = teacherName ? `Good day ${teacherName}, ` : 'Attention Dadaya High Teacher: ';
+  const title = reminderType === 'clock_in' 
+    ? '⏰ Morning Clock-In Reminder'
+    : '⏰ Afternoon Clock-Out Reminder';
+
+  const body = reminderType === 'clock_in'
+    ? `${greeting}Morning clocking is active (07:00 - 07:45). Remember to clock in when you arrive on campus!`
+    : `${greeting}Official school day concludes at 16:30. Please remember to clock out before leaving campus!`;
+
+  const sent = await sendPhoneNotification({
+    title,
+    body,
+    tag: `reminder-${reminderType}-${dateStr}`,
+    vibrate: [250, 100, 250, 100, 400],
+  });
+
+  if (sent && typeof localStorage !== 'undefined' && forceType !== 'manual_test') {
+    localStorage.setItem(storageKey, 'true');
+  }
+
+  return { sent, reason: sent ? 'Reminder delivered to device' : 'Device notification could not be delivered' };
+}
+
+/**
  * Schedules background periodic checks for clock-in reminders and public holiday greetings
  */
 export function initializeBackgroundNotificationService(): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  // 1. Check for holiday greeting immediately on boot
+  // 1. Check for holiday greeting & clocking reminder immediately on boot
   checkAndSendHolidayGreeting().catch(() => {});
+  checkAndSendClockingReminder().catch(() => {});
 
-  // 2. Periodic background interval (every 10 minutes)
+  // 2. Periodic background interval (every 5 minutes to catch reminder window)
   const intervalId = setInterval(() => {
     checkAndSendHolidayGreeting().catch(() => {});
-  }, 10 * 60 * 1000);
+    checkAndSendClockingReminder().catch(() => {});
+  }, 5 * 60 * 1000);
 
   // 3. Trigger check on window focus / resume from background
   const handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
       checkAndSendHolidayGreeting().catch(() => {});
+      checkAndSendClockingReminder().catch(() => {});
     }
   };
 

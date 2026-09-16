@@ -22,10 +22,14 @@ import {
   ChevronRight,
   UserCheck,
   WifiOff,
+  GraduationCap,
+  HelpCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EarlyClockModal } from './EarlyClockModal';
 import { evaluateAttendanceEligibility } from '../../utils/zimbabweCalendar';
+import { sendPhoneNotification } from '../../utils/phoneNotifications';
+import { triggerHaptic } from '../../utils/haptics';
 
 export const TeacherDashboard: React.FC = () => {
   const {
@@ -45,6 +49,7 @@ export const TeacherDashboard: React.FC = () => {
     demoCoords,
     setSimulationMode,
     simulationStatus,
+    selectedTeacherClass,
   } = useApp();
 
   const isOffline = !isOnline || (typeof navigator !== 'undefined' && !navigator.onLine);
@@ -60,6 +65,12 @@ export const TeacherDashboard: React.FC = () => {
   const [badgeInput, setBadgeInput] = useState('');
   const [badgeScanning, setBadgeScanning] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Automatic Clock-In date tracker (Ensures automatic clock-in runs once per day upon entering geofence)
+  const [autoClockInTriggeredDate, setAutoClockInTriggeredDate] = useState<string>(() => {
+    return localStorage.getItem('dadaya_last_auto_clockin_date') || '';
+  });
+
   // Location and Geofencing state
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({
     lat: schoolSettings.schoolLatitude,
@@ -145,6 +156,64 @@ export const TeacherDashboard: React.FC = () => {
   }, [effectiveCoords, schoolSettings.schoolLatitude, schoolSettings.schoolLongitude]);
 
   const isWithinCampus = distanceMeters <= schoolSettings.allowedRadiusMeters;
+
+  // AUTOMATIC CLOCK-IN WHEN ENTERING GEOFENCE (STRICTLY ONLY FOR CLOCKING IN)
+  useEffect(() => {
+    // Constraints: Strictly for clocking in only
+    if (isOffline) return; // Constraint: No offline clocking allowed
+    if (!eligibility.canClock) return; // Constraint: Active school day/term & not public holiday
+    if (todayRecord?.clockInTime) return; // Already clocked in today
+    if (!isWithinCampus) return; // Must be physically inside Dadaya High School campus geofence
+
+    const todayDateStr = currentTime.toISOString().split('T')[0];
+    if (autoClockInTriggeredDate === todayDateStr) return; // Already triggered today
+
+    const hours = currentTime.getHours();
+    const mins = currentTime.getMinutes();
+    const isEarly = hours < 7 || (hours === 7 && mins < 15);
+    const autoReason = isEarly
+      ? 'Automatic Geofence Clock-In on Early Campus Arrival'
+      : 'Automatic Geofence Clock-In on Campus Arrival';
+
+    // Execute automatic clock-in on campus geofence entry
+    setAutoClockInTriggeredDate(todayDateStr);
+    localStorage.setItem('dadaya_last_auto_clockin_date', todayDateStr);
+
+    (async () => {
+      try {
+        const res = await clockIn(autoReason, isEarly, {
+          latitude: effectiveCoords.lat,
+          longitude: effectiveCoords.lng,
+        });
+
+        if (res.success) {
+          triggerHaptic('success');
+          await sendPhoneNotification({
+            title: '⚡ Automatic Geofence Clock-In',
+            body: `Welcome to Dadaya High School, ${currentUser?.name}! Your arrival inside the campus geofence was detected and your attendance was automatically clocked in.`,
+            tag: `auto-clockin-${todayDateStr}`,
+          });
+          setFeedbackMsg({
+            text: `⚡ Automatic Geofence Clock-In: Welcome to Dadaya High School! You entered the campus boundary and your attendance was automatically clocked in.`,
+            type: 'success',
+          });
+        }
+      } catch (err) {
+        console.warn('Auto clock-in error:', err);
+      }
+    })();
+  }, [
+    isWithinCampus,
+    isOffline,
+    eligibility.canClock,
+    todayRecord?.clockInTime,
+    autoClockInTriggeredDate,
+    currentTime,
+    effectiveCoords.lat,
+    effectiveCoords.lng,
+    currentUser?.name,
+    clockIn,
+  ]);
 
   const getGreeting = () => {
     const hour = currentTime.getHours();
@@ -480,6 +549,8 @@ export const TeacherDashboard: React.FC = () => {
             </span>
           )}
         </div>
+
+
 
         {/* 2-Column Time Display */}
         <div className="grid grid-cols-2 gap-3 text-center">
@@ -906,6 +977,39 @@ export const TeacherDashboard: React.FC = () => {
         </button>
       </div>
 
+      {/* Student Attendance & Class Roll Call Banner Card */}
+      <div className="bg-linear-to-r from-emerald-800 to-teal-900 text-white rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/10 text-emerald-200 border border-white/15 flex items-center justify-center shrink-0">
+            <GraduationCap className="w-5 h-5 text-emerald-300" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xs font-bold text-white">Student Attendance Register</h3>
+              <span className="px-2 py-0.2 bg-emerald-700/80 border border-emerald-500/40 rounded-md text-[10px] font-bold text-emerald-200">
+                {selectedTeacherClass ? `Class: ${selectedTeacherClass}` : 'No Class Registered'}
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-200/90 mt-0.5">
+              Enter daily Boys & Girls (Boarders & Day Scholars), search by date & download official MoPSE PDFs
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            triggerHaptic('selection');
+            setActiveView('attendance');
+          }}
+          className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1 shrink-0 cursor-pointer"
+        >
+          <span>Open Roll Call</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+
+
       {/* Early Clock Reason Modal */}
       {modalType && (
         <EarlyClockModal
@@ -1008,6 +1112,8 @@ export const TeacherDashboard: React.FC = () => {
           </motion.div>
         </div>
       )}
+
+
     </div>
   );
 };
