@@ -15,7 +15,7 @@ import {
   Building2,
   Calendar,
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp, sortNotificationsNewestFirst } from '../../context/AppContext';
 import { SchoolCrest } from './SchoolCrest';
 import { PWAInstallButton } from './PWAInstallButton';
 import { triggerHaptic } from '../../utils/haptics';
@@ -30,7 +30,10 @@ export const Header: React.FC = () => {
   } = useApp();
 
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
-  const unreadNotifs = notifications.filter((n) => !n.acknowledgedByAdmin);
+  const sortedNotifications = React.useMemo(() => {
+    return sortNotificationsNewestFirst(notifications);
+  }, [notifications]);
+  const unreadNotifs = sortedNotifications.filter((n) => !n.acknowledgedByAdmin);
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-2xs">
@@ -133,45 +136,58 @@ export const Header: React.FC = () => {
                       </span>
                     </div>
 
-                    {notifications.length === 0 ? (
+                    {sortedNotifications.length === 0 ? (
                       <div className="p-4 text-center text-gray-400">
                         <Bell className="w-6 h-6 mx-auto mb-1 text-gray-300" />
                         <p>No notifications yet</p>
                       </div>
                     ) : (
-                      <div className="max-h-64 overflow-y-auto space-y-2">
-                        {notifications.slice(0, 8).map((notif) => (
-                          <div
-                            key={notif.id}
-                            className={`p-2.5 rounded-xl border ${
-                              notif.acknowledgedByAdmin
-                                ? 'bg-slate-50 border-slate-200'
-                                : notif.type === 'early_in' || notif.type === 'early_out'
-                                ? 'bg-amber-50 border-amber-200'
-                                : notif.type === 'late_in'
-                                ? 'bg-rose-50 border-rose-200'
-                                : 'bg-emerald-50 border-emerald-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-bold text-gray-900">
-                                {notif.teacherName} {notif.teacherSurname}
-                              </span>
-                              <span className="text-[9px] text-gray-500 font-mono">{notif.time}</span>
+                      <div className="max-h-72 overflow-y-auto space-y-2">
+                        {sortedNotifications.slice(0, 10).map((notif, index) => {
+                          const isToday = notif.date === new Date().toISOString().split('T')[0];
+                          const isNewest = index === 0;
+                          return (
+                            <div
+                              key={notif.id}
+                              className={`p-2.5 rounded-xl border transition ${
+                                notif.acknowledgedByAdmin
+                                  ? 'bg-slate-50 border-slate-200'
+                                  : notif.type === 'early_in' || notif.type === 'early_out'
+                                  ? 'bg-amber-50 border-amber-200'
+                                  : notif.type === 'late_in'
+                                  ? 'bg-rose-50 border-rose-200'
+                                  : 'bg-emerald-50 border-emerald-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {isNewest && !notif.acknowledgedByAdmin && (
+                                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white font-bold text-[8px] rounded uppercase tracking-wider animate-pulse">
+                                      Latest
+                                    </span>
+                                  )}
+                                  <span className="font-bold text-gray-900">
+                                    {notif.teacherName} {notif.teacherSurname}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] text-gray-500 font-mono">
+                                  {isToday ? notif.time : `${notif.date} ${notif.time}`}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-gray-700">
+                                {notif.reason}
+                              </p>
+                              {!notif.acknowledgedByAdmin && (
+                                <button
+                                  onClick={() => acknowledgeNotification(notif.id)}
+                                  className="mt-1.5 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md hover:bg-emerald-200 transition"
+                                >
+                                  Mark Reviewed
+                                </button>
+                              )}
                             </div>
-                            <p className="text-[11px] text-gray-700">
-                              {notif.reason}
-                            </p>
-                            {!notif.acknowledgedByAdmin && (
-                              <button
-                                onClick={() => acknowledgeNotification(notif.id)}
-                                className="mt-1.5 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md hover:bg-emerald-200 transition"
-                              >
-                                Mark Reviewed
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

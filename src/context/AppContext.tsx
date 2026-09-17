@@ -290,6 +290,60 @@ export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
   },
 ];
 
+export const getNotificationTimestamp = (notif: Partial<EarlyClockNotification>): number => {
+  if (!notif) return 0;
+  if (typeof notif.timestamp === 'number' && !isNaN(notif.timestamp) && notif.timestamp > 0) {
+    return notif.timestamp;
+  }
+  if (typeof notif.timestamp === 'string') {
+    const parsedNum = Number(notif.timestamp);
+    if (!isNaN(parsedNum) && parsedNum > 1000000000) {
+      return parsedNum;
+    }
+    const parsedDate = new Date(notif.timestamp).getTime();
+    if (!isNaN(parsedDate) && parsedDate > 0) {
+      return parsedDate;
+    }
+  }
+  if (notif.date && notif.time) {
+    const cleanTime = notif.time.length === 5 ? `${notif.time}:00` : notif.time;
+    const dt = new Date(`${notif.date}T${cleanTime}`).getTime();
+    if (!isNaN(dt) && dt > 0) {
+      return dt;
+    }
+  }
+  if (notif.date) {
+    const dt = new Date(notif.date).getTime();
+    if (!isNaN(dt) && dt > 0) {
+      return dt;
+    }
+  }
+  const match = notif.id?.match(/\d{10,}/);
+  if (match) {
+    const val = Number(match[0]);
+    if (!isNaN(val)) return val;
+  }
+  return 0;
+};
+
+export const sortNotificationsNewestFirst = (
+  list: EarlyClockNotification[]
+): EarlyClockNotification[] => {
+  if (!Array.isArray(list)) return [];
+  return [...list].sort((a, b) => {
+    const timeA = getNotificationTimestamp(a);
+    const timeB = getNotificationTimestamp(b);
+    if (timeA !== timeB) {
+      return timeB - timeA; // Descending: newest timestamp at the very top (index 0)
+    }
+    const dateComp = (b.date || '').localeCompare(a.date || '');
+    if (dateComp !== 0) return dateComp;
+    const timeComp = (b.time || '').localeCompare(a.time || '');
+    if (timeComp !== 0) return timeComp;
+    return (b.id || '').localeCompare(a.id || '');
+  });
+};
+
 const STORAGE_KEYS = {
   CURRENT_USER: 'dadaya_current_user_v2',
   SETTINGS: 'dadaya_school_settings_v2',
@@ -388,7 +442,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? sortNotificationsNewestFirst(parsed) : [];
       } catch {
         return [];
       }
@@ -669,7 +724,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: docSnap.id,
               ...docSnap.data(),
             } as EarlyClockNotification));
-            setNotifications(firestoreNotifs);
+            setNotifications(sortNotificationsNewestFirst(firestoreNotifs));
           }
         },
         (error) => {
@@ -912,22 +967,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (notifRes && notifRes.ok) {
           const remoteNotifs = await notifRes.json();
           if (Array.isArray(remoteNotifs)) {
-            const mappedNotifs: EarlyClockNotification[] = remoteNotifs.map((n: any) => ({
-              id: n.id,
-              recordId: 'rec_' + n.id,
-              teacherId: n.teacherId,
-              teacherName: n.teacherName,
-              teacherSurname: n.teacherSurname,
-              subject: 'Academic Department',
-              type: n.type,
-              time: n.time,
-              date: n.date,
-              reason: n.reason,
-              acknowledgedByAdmin: n.acknowledgedByAdmin,
-              read: n.acknowledgedByAdmin,
-              timestamp: Date.now(),
-            }));
-            setNotifications(mappedNotifs);
+            const mappedNotifs: EarlyClockNotification[] = remoteNotifs.map((n: any) => {
+              let ts = Date.now();
+              if (typeof n.timestamp === 'number' && n.timestamp > 0) {
+                ts = n.timestamp;
+              } else if (typeof n.timestamp === 'string') {
+                const num = Number(n.timestamp);
+                ts = !isNaN(num) && num > 1000000000 ? num : (new Date(n.timestamp).getTime() || Date.now());
+              } else if (n.createdAt) {
+                ts = new Date(n.createdAt).getTime() || Date.now();
+              }
+              return {
+                id: n.id,
+                recordId: 'rec_' + n.id,
+                teacherId: n.teacherId,
+                teacherName: n.teacherName,
+                teacherSurname: n.teacherSurname,
+                subject: 'Academic Department',
+                type: n.type,
+                time: n.time,
+                date: n.date,
+                reason: n.reason,
+                acknowledgedByAdmin: n.acknowledgedByAdmin,
+                read: n.acknowledgedByAdmin,
+                timestamp: ts,
+              };
+            });
+            setNotifications(sortNotificationsNewestFirst(mappedNotifs));
           }
         }
 
@@ -1656,7 +1722,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       acknowledgedByAdmin: false,
     };
 
-    setNotifications((prev) => [newNotification, ...prev]);
+    setNotifications((prev) =>
+      sortNotificationsNewestFirst([
+        newNotification,
+        ...prev.filter((n) => n.id !== newNotification.id),
+      ])
+    );
 
     // Save to Firebase Firestore
     try {
@@ -1836,7 +1907,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       acknowledgedByAdmin: false,
     };
 
-    setNotifications((prev) => [newNotification, ...prev]);
+    setNotifications((prev) =>
+      sortNotificationsNewestFirst([
+        newNotification,
+        ...prev.filter((n) => n.id !== newNotification.id),
+      ])
+    );
 
     // Save to Firebase Firestore
     try {
@@ -2101,7 +2177,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       acknowledgedByAdmin: false,
     };
 
-    setNotifications((prev) => [notif, ...prev]);
+    setNotifications((prev) =>
+      sortNotificationsNewestFirst([
+        notif,
+        ...prev.filter((n) => n.id !== notif.id),
+      ])
+    );
 
     const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
@@ -2275,7 +2356,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn(e);
     }
 
-    setNotifications((prev) => [notif, ...prev]);
+    setNotifications((prev) =>
+      sortNotificationsNewestFirst([
+        notif,
+        ...prev.filter((n) => n.id !== notif.id),
+      ])
+    );
   };
 
   const acknowledgeNotification = (id: string) => {

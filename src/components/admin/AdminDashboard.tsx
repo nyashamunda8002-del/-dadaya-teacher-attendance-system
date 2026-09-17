@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
   Users,
@@ -13,7 +13,7 @@ import {
   TrendingUp,
   BellRing,
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp, sortNotificationsNewestFirst } from '../../context/AppContext';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -41,13 +41,16 @@ export const AdminDashboard: React.FC = () => {
   // Early & live notifications pending
   const unreadEarlyNotifs = notifications.filter((n) => !n.acknowledgedByAdmin);
 
-  // Filtered notifications
-  const displayedNotifs = notifications.filter((n) => {
-    if (filterType === 'early') return n.type === 'early_in' || n.type === 'early_out';
-    if (filterType === 'late') return n.type === 'late_in';
-    if (filterType === 'clock') return n.type === 'clock_in' || n.type === 'clock_out';
-    return true;
-  });
+  // Filtered notifications - GUARANTEED newest first at the top
+  const displayedNotifs = useMemo(() => {
+    const filtered = notifications.filter((n) => {
+      if (filterType === 'early') return n.type === 'early_in' || n.type === 'early_out';
+      if (filterType === 'late') return n.type === 'late_in';
+      if (filterType === 'clock') return n.type === 'clock_in' || n.type === 'clock_out';
+      return true;
+    });
+    return sortNotificationsNewestFirst(filtered);
+  }, [notifications, filterType]);
 
   // Total working hours for today
   const totalTodayMinutes = todayRecords.reduce((acc, r) => acc + (r.totalWorkingMinutes || 0), 0);
@@ -250,7 +253,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2.5">
-            {displayedNotifs.slice(0, 10).map((notif) => {
+            {displayedNotifs.slice(0, 15).map((notif, index) => {
               const badgeConfig = (() => {
                 switch (notif.type) {
                   case 'early_in':
@@ -268,6 +271,9 @@ export const AdminDashboard: React.FC = () => {
                 }
               })();
 
+              const isNewestAlert = index === 0 && !notif.acknowledgedByAdmin;
+              const isToday = notif.date === todayStr;
+
               return (
                 <motion.div
                   key={notif.id}
@@ -277,14 +283,20 @@ export const AdminDashboard: React.FC = () => {
                     notif.acknowledgedByAdmin
                       ? 'bg-slate-50/70 border-slate-200 opacity-85'
                       : notif.type === 'early_in' || notif.type === 'early_out'
-                      ? 'bg-amber-50/90 border-amber-300 shadow-2xs'
+                      ? 'bg-amber-50/90 border-amber-300 shadow-2xs ring-1 ring-amber-200/50'
                       : notif.type === 'late_in'
-                      ? 'bg-rose-50/80 border-rose-200 shadow-2xs'
+                      ? 'bg-rose-50/80 border-rose-200 shadow-2xs ring-1 ring-rose-200/50'
                       : 'bg-slate-50 border-slate-200 shadow-2xs'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {isNewestAlert && (
+                        <span className="px-1.5 py-0.2 bg-emerald-600 text-white font-extrabold text-[9px] rounded uppercase tracking-wider animate-pulse flex items-center gap-1 shadow-2xs">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          Latest
+                        </span>
+                      )}
                       <span
                         className={`px-2 py-0.2 rounded text-[9px] font-black uppercase ${badgeConfig.bg}`}
                       >
@@ -299,7 +311,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
 
                     <span className="text-[10px] text-gray-500 font-mono font-bold">
-                      {notif.time}
+                      {isToday ? notif.time : `${notif.date} ${notif.time}`}
                     </span>
                   </div>
 
