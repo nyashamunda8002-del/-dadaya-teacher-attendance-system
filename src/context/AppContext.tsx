@@ -462,29 +462,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           );
           if (!hasOldTemplate) {
             // Remove Form 1 White
-            const filtered = parsed.filter(
+            const merged = parsed.filter(
               (c: any) => c.name !== 'Form 1 White' && c.id !== 'cls-1white'
             );
-            // Ensure Form 1 Yellow is included
-            const hasYellow = filtered.some(
-              (c: any) => c.name === 'Form 1 Yellow' || c.id === 'cls-1yellow'
-            );
-            if (!hasYellow) {
-              const yellowCls: SchoolClass = {
-                id: 'cls-1yellow',
-                name: 'Form 1 Yellow',
-                formLevel: 'Form 1',
-                capacity: 45,
-                roomNumber: 'Form 1 Block, Rm 3',
-              };
-              const greenIdx = filtered.findIndex((c: any) => c.id === 'cls-1green' || c.name === 'Form 1 Green');
-              if (greenIdx >= 0) {
-                filtered.splice(greenIdx + 1, 0, yellowCls);
-              } else {
-                filtered.unshift(yellowCls);
+            // Guarantee ALL official Dadaya classes (all 23 streams) are present
+            for (const defCls of DEFAULT_CLASSES) {
+              const exists = merged.some(
+                (c: any) =>
+                  c.id === defCls.id ||
+                  c.name?.toLowerCase().trim() === defCls.name.toLowerCase().trim()
+              );
+              if (!exists) {
+                merged.push(defCls);
               }
             }
-            return filtered;
+            // Sort in canonical Dadaya stream order
+            const defaultOrder = DEFAULT_CLASSES.map((c) => c.name.toLowerCase());
+            merged.sort((a: any, b: any) => {
+              const idxA = defaultOrder.indexOf(a.name?.toLowerCase());
+              const idxB = defaultOrder.indexOf(b.name?.toLowerCase());
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return (a.name || '').localeCompare(b.name || '');
+            });
+            localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(merged));
+            return merged;
           }
         }
       } catch {}
@@ -606,10 +609,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         usersCol,
         (snapshot) => {
           if (!snapshot.empty) {
-            const firestoreUsers: User[] = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...docSnap.data(),
-            } as User));
+            const firestoreUsers: User[] = snapshot.docs.map((docSnap) => {
+              const u = {
+                id: docSnap.id,
+                ...docSnap.data(),
+              } as User;
+              if (u.assignedClasses && u.assignedClasses.includes('Form 1 White')) {
+                u.assignedClasses = u.assignedClasses.map((c) =>
+                  c === 'Form 1 White' ? 'Form 1 Yellow' : c
+                );
+                updateDoc(doc(db, 'users', docSnap.id), {
+                  assignedClasses: u.assignedClasses,
+                }).catch(() => null);
+              }
+              return u;
+            });
             setUsers(firestoreUsers);
 
             // Maintain persistent teacher/admin login without asking for credentials
@@ -719,10 +733,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         studentAttCol,
         (snapshot) => {
           if (!snapshot.empty) {
-            const firestoreStudentAtt: StudentAttendanceRecord[] = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...docSnap.data(),
-            } as StudentAttendanceRecord));
+            const firestoreStudentAtt: StudentAttendanceRecord[] = snapshot.docs.map((docSnap) => {
+              const r = {
+                id: docSnap.id,
+                ...docSnap.data(),
+              } as StudentAttendanceRecord;
+              if (r.className === 'Form 1 White') {
+                r.className = 'Form 1 Yellow';
+                updateDoc(doc(db, 'student_attendance', docSnap.id), { className: 'Form 1 Yellow' }).catch(() => null);
+              }
+              return r;
+            });
             setStudentAttendanceRecords(firestoreStudentAtt);
           }
         },
@@ -737,54 +758,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         classesCol,
         (snapshot) => {
           if (!snapshot.empty) {
-            const firestoreClasses: SchoolClass[] = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...docSnap.data(),
-            } as SchoolClass));
+            // Delete any Firestore documents corresponding to Form 1 White
+            snapshot.docs.forEach((d) => {
+              const data = d.data();
+              if (d.id === 'cls-1white' || data.name?.toLowerCase().trim() === 'form 1 white') {
+                deleteDoc(doc(db, 'classes', d.id)).catch(() => null);
+              }
+            });
 
-            // Ensure Form 1 White is cleaned from Firestore and Form 1 Yellow is present
-            if (firestoreClasses.some((c: any) => c.id === 'cls-1white' || c.name === 'Form 1 White')) {
-              deleteDoc(doc(db, 'classes', 'cls-1white')).catch(() => null);
-            }
+            const firestoreClasses: SchoolClass[] = snapshot.docs
+              .map((docSnap) => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+              } as SchoolClass))
+              .filter(
+                (c: any) => c.id !== 'cls-1white' && c.name?.toLowerCase().trim() !== 'form 1 white'
+              );
 
-            const yellowInFirestore = firestoreClasses.some(
-              (c: any) => c.id === 'cls-1yellow' || c.name === 'Form 1 Yellow'
-            );
-            if (!yellowInFirestore) {
-              const yellowCls = DEFAULT_CLASSES.find((c) => c.id === 'cls-1yellow');
-              if (yellowCls) {
-                setDoc(doc(db, 'classes', 'cls-1yellow'), yellowCls).catch(() => null);
+            // Guarantee ALL 23 official Dadaya High School classes exist in Firestore & local state
+            for (const defCls of DEFAULT_CLASSES) {
+              const exists = firestoreClasses.some(
+                (c: any) =>
+                  c.id === defCls.id ||
+                  c.name?.toLowerCase().trim() === defCls.name.toLowerCase().trim()
+              );
+              if (!exists) {
+                setDoc(doc(db, 'classes', defCls.id), defCls).catch(() => null);
+                firestoreClasses.push(defCls);
               }
             }
 
-            const cleanClasses = firestoreClasses
-              .filter((c: any) => c.id !== 'cls-1white' && c.name !== 'Form 1 White');
+            // Sort classes according to canonical Dadaya order
+            const defaultOrder = DEFAULT_CLASSES.map((c) => c.name.toLowerCase());
+            firestoreClasses.sort((a, b) => {
+              const idxA = defaultOrder.indexOf(a.name?.toLowerCase());
+              const idxB = defaultOrder.indexOf(b.name?.toLowerCase());
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true });
+            });
 
-            if (!yellowInFirestore) {
-              const yellowCls = DEFAULT_CLASSES.find((c) => c.id === 'cls-1yellow');
-              if (yellowCls && !cleanClasses.some((c) => c.id === 'cls-1yellow')) {
-                cleanClasses.push(yellowCls);
-              }
-            }
-
-            const hasOldTemplate = cleanClasses.some(
+            const hasOldTemplate = firestoreClasses.some(
               (c: any) => c.name === 'Form 1A' || c.id === 'cls-1a' || c.name === 'Form 2A' || c.name === 'Form 3 Science'
             );
 
             if (!hasOldTemplate) {
-              setClasses(cleanClasses);
+              setClasses(firestoreClasses);
+              localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(firestoreClasses));
             } else {
               // Remote still has obsolete template classes; replace them with official Dadaya classes
               DEFAULT_CLASSES.forEach((cls) => {
                 setDoc(doc(db, 'classes', cls.id), cls).catch(() => null);
               });
               setClasses(DEFAULT_CLASSES);
+              localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(DEFAULT_CLASSES));
             }
           } else {
             // Seed official classes to Firestore on first load
             DEFAULT_CLASSES.forEach((cls) => {
               setDoc(doc(db, 'classes', cls.id), cls).catch(() => null);
             });
+            setClasses(DEFAULT_CLASSES);
+            localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(DEFAULT_CLASSES));
           }
         },
         (error) => {
@@ -802,6 +838,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await setDoc(doc(db, 'users', DEFAULT_ADMIN_USER.id), DEFAULT_ADMIN_USER);
       } catch (e) {
         console.warn('Admin Firestore seed notice:', e);
+      }
+      try {
+        await deleteDoc(doc(db, 'classes', 'cls-1white')).catch(() => null);
+        for (const cls of DEFAULT_CLASSES) {
+          await setDoc(doc(db, 'classes', cls.id), cls).catch(() => null);
+        }
+      } catch (e) {
+        console.warn('Classes seeding notice:', e);
       }
       try {
         await fetch('/api/users', {

@@ -13,7 +13,7 @@ import {
   Edit3,
   Plus,
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp, DEFAULT_CLASSES } from '../../context/AppContext';
 import { exportDailyStudentAttendancePDF } from '../../utils/studentAttendancePdf';
 
 export const AdminStudentAttendance: React.FC = () => {
@@ -40,10 +40,16 @@ export const AdminStudentAttendance: React.FC = () => {
 
   // Group classes and merge with attendance on selectedDate
   const tableData = useMemo(() => {
-    // Sort classes
-    const sorted = [...classes].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { numeric: true })
-    );
+    // Sort classes in canonical Dadaya stream order
+    const defaultOrder = DEFAULT_CLASSES.map((c) => c.name.toLowerCase());
+    const sorted = [...classes].sort((a, b) => {
+      const idxA = defaultOrder.indexOf(a.name.toLowerCase());
+      const idxB = defaultOrder.indexOf(b.name.toLowerCase());
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
 
     return sorted
       .filter((cls) => {

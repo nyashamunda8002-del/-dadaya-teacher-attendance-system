@@ -13,8 +13,9 @@ import {
   Sparkles,
   Layers,
   ChevronRight,
+  RotateCcw,
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp, DEFAULT_CLASSES } from '../../context/AppContext';
 import { exportSingleClassAttendancePDF } from '../../utils/studentAttendancePdf';
 import { StudentAttendanceRecord } from '../../types';
 
@@ -26,6 +27,7 @@ export const TeacherStudentAttendance: React.FC = () => {
     selectedTeacherClass,
     setSelectedTeacherClass,
     saveStudentAttendance,
+    resetToOfficialClasses,
     schoolSettings,
   } = useApp();
 
@@ -34,6 +36,8 @@ export const TeacherStudentAttendance: React.FC = () => {
 
   const [inputClassName, setInputClassName] = useState<string>(selectedTeacherClass || '');
   const [isChangingClass, setIsChangingClass] = useState<boolean>(!selectedTeacherClass);
+  const [selectedFormTab, setSelectedFormTab] = useState<string>('All');
+  const [isSyncingClasses, setIsSyncingClasses] = useState<boolean>(false);
 
   // Form state
   const todayStr = new Date().toISOString().split('T')[0];
@@ -51,6 +55,18 @@ export const TeacherStudentAttendance: React.FC = () => {
 
   // Active class name
   const currentClass = selectedTeacherClass;
+
+  const sortedClasses = useMemo(() => {
+    const defaultOrder = DEFAULT_CLASSES.map((c) => c.name.toLowerCase());
+    return [...classes].sort((a, b) => {
+      const idxA = defaultOrder.indexOf(a.name.toLowerCase());
+      const idxB = defaultOrder.indexOf(b.name.toLowerCase());
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
+  }, [classes]);
 
   // Find class capacity from classes list if available
   const matchedSchoolClass = classes.find(
@@ -288,29 +304,172 @@ export const TeacherStudentAttendance: React.FC = () => {
             )}
           </div>
 
-          {/* Quick suggestions from school classes */}
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">
-              Official Dadaya High School Classes:
-            </p>
-            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-              {classes.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setInputClassName(c.name);
-                    handleRegisterOrChangeClass(c.name);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                    currentClass.toLowerCase() === c.name.toLowerCase()
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700'
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
+          {/* Complete Directory of Dadaya High School Classes */}
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-3">
+            {/* Header with stream count & sync button */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-xs text-slate-700 font-bold uppercase tracking-wider">
+                  All Dadaya High School Classes ({sortedClasses.length} Streams):
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Select your class stream to immediately register and manage daily roll call
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsSyncingClasses(true);
+                  try {
+                    await resetToOfficialClasses();
+                  } finally {
+                    setIsSyncingClasses(false);
+                  }
+                }}
+                disabled={isSyncingClasses}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-600 rounded-lg text-xs font-semibold transition-colors border border-slate-200 shadow-2xs disabled:opacity-50"
+                title="Synchronize all 23 official Dadaya High School classes"
+              >
+                <RotateCcw className={`w-3 h-3 ${isSyncingClasses ? 'animate-spin text-emerald-600' : ''}`} />
+                <span>Sync All 23 Classes</span>
+              </button>
             </div>
+
+            {/* Allocated to this teacher (if any) */}
+            {assignedClasses.length > 0 && (
+              <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-xl">
+                <p className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-700" />
+                  Your Assigned Class{assignedClasses.length > 1 ? 'es' : ''}:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {assignedClasses.map((clsName) => {
+                    const isSelected = currentClass.toLowerCase() === clsName.toLowerCase();
+                    return (
+                      <button
+                        key={clsName}
+                        type="button"
+                        onClick={() => {
+                          setInputClassName(clsName);
+                          handleRegisterOrChangeClass(clsName);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs ${
+                          isSelected
+                            ? 'bg-emerald-700 text-white ring-2 ring-emerald-400'
+                            : 'bg-white text-emerald-900 hover:bg-emerald-100 border border-emerald-300'
+                        }`}
+                      >
+                        {clsName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Form Level Filter Tabs */}
+            <div className="flex flex-wrap gap-1 pb-1">
+              {(['All', 'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Lower 6', 'Upper 6'] as const).map((tab) => {
+                const count = tab === 'All'
+                  ? sortedClasses.length
+                  : sortedClasses.filter((c) =>
+                      c.formLevel?.toLowerCase() === tab.toLowerCase() ||
+                      c.name.toLowerCase().startsWith(tab.toLowerCase())
+                    ).length;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setSelectedFormTab(tab)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                      selectedFormTab === tab
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {tab} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Class Stream Badges */}
+            {selectedFormTab === 'All' ? (
+              <div className="space-y-2.5 pt-1">
+                {(['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Lower 6', 'Upper 6'] as const).map((level) => {
+                  const levelClasses = sortedClasses.filter(
+                    (c) =>
+                      c.formLevel?.toLowerCase() === level.toLowerCase() ||
+                      c.name.toLowerCase().startsWith(level.toLowerCase())
+                  );
+                  if (levelClasses.length === 0) return null;
+                  return (
+                    <div key={level} className="p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/60">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          {level}
+                        </span>
+                        <span className="text-[10px] bg-slate-200/80 text-slate-600 font-bold px-1.5 py-0.2 rounded-md">
+                          {levelClasses.length} stream{levelClasses.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {levelClasses.map((c) => {
+                          const isSelected = currentClass.toLowerCase() === c.name.toLowerCase();
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setInputClassName(c.name);
+                                handleRegisterOrChangeClass(c.name);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-700 text-white shadow-xs ring-2 ring-emerald-500'
+                                  : 'bg-white hover:bg-emerald-50 hover:text-emerald-900 hover:border-emerald-300 text-slate-700 border border-slate-200 shadow-2xs'
+                              }`}
+                            >
+                              {c.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {sortedClasses
+                  .filter(
+                    (c) =>
+                      c.formLevel?.toLowerCase() === selectedFormTab.toLowerCase() ||
+                      c.name.toLowerCase().startsWith(selectedFormTab.toLowerCase())
+                  )
+                  .map((c) => {
+                    const isSelected = currentClass.toLowerCase() === c.name.toLowerCase();
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setInputClassName(c.name);
+                          handleRegisterOrChangeClass(c.name);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          isSelected
+                            ? 'bg-emerald-700 text-white shadow-xs ring-2 ring-emerald-500'
+                            : 'bg-white hover:bg-emerald-50 hover:text-emerald-900 hover:border-emerald-300 text-slate-700 border border-slate-200 shadow-2xs'
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
       )}

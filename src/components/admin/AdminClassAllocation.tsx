@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   BookOpen,
@@ -15,7 +15,7 @@ import {
   X,
   RotateCcw,
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp, DEFAULT_CLASSES } from '../../context/AppContext';
 import { SchoolClass, User } from '../../types';
 
 export const AdminClassAllocation: React.FC = () => {
@@ -27,6 +27,19 @@ export const AdminClassAllocation: React.FC = () => {
     deleteSchoolClass,
     resetToOfficialClasses,
   } = useApp();
+
+  const defaultOrder = useMemo(() => DEFAULT_CLASSES.map((c) => c.name.toLowerCase()), []);
+
+  const sortedClasses = useMemo(() => {
+    return [...classes].sort((a, b) => {
+      const idxA = defaultOrder.indexOf(a.name.toLowerCase());
+      const idxB = defaultOrder.indexOf(b.name.toLowerCase());
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
+  }, [classes, defaultOrder]);
 
   const teachers = users.filter((u) => u.role === 'teacher');
 
@@ -310,7 +323,7 @@ export const AdminClassAllocation: React.FC = () => {
       {activeTab === 'classes' && (
         <div className="space-y-6">
           {['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Lower 6', 'Upper 6'].map((level) => {
-            const formClasses = classes.filter((c) => c.formLevel === level);
+            const formClasses = sortedClasses.filter((c) => c.formLevel === level);
             if (formClasses.length === 0) return null;
 
             return (
@@ -409,7 +422,7 @@ export const AdminClassAllocation: React.FC = () => {
               <div className="flex items-center justify-between text-xs text-slate-500 font-semibold border-b border-slate-100 pb-2">
                 <span>Select Classes ({selectedClassNames.length} selected)</span>
                 <button
-                  onClick={() => setSelectedClassNames(classes.map((c) => c.name))}
+                  onClick={() => setSelectedClassNames(sortedClasses.map((c) => c.name))}
                   className="text-emerald-700 hover:underline"
                 >
                   Select All
@@ -417,7 +430,7 @@ export const AdminClassAllocation: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {classes.map((c) => {
+                {sortedClasses.map((c) => {
                   const isChecked = selectedClassNames.includes(c.name);
                   const isOtherAssigned =
                     c.assignedTeacherId &&
