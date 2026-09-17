@@ -28,6 +28,7 @@ import { AdminStudentAttendance } from './components/admin/AdminStudentAttendanc
 import { AdminClassAllocation } from './components/admin/AdminClassAllocation';
 
 import { LocationGate } from './components/common/LocationGate';
+import { OfflineIndicator } from './components/common/OfflineIndicator';
 
 const MainAppContent: React.FC = () => {
   const { currentUser, isLoading, activeView, setActiveView } = useApp();
@@ -112,6 +113,7 @@ const MainAppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-100 flex flex-col text-slate-900 selection:bg-emerald-200">
       <Header />
       <Navigation />
+      <OfflineIndicator />
 
       {/* Main Content Area - Optimized for mobile touch & desktop readability */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-3 py-4 sm:px-6 sm:py-6 pb-24 md:pb-12">

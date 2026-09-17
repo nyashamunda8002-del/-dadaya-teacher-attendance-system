@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { SchoolCrest } from './SchoolCrest';
+import { PWAInstallButton } from './PWAInstallButton';
 import { triggerHaptic } from '../../utils/haptics';
 
 export const Header: React.FC = () => {
@@ -88,6 +89,8 @@ export const Header: React.FC = () => {
 
           {/* Right Controls: Notification Bell (Admin), Role Badge, Profile/Logout */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <PWAInstallButton />
+
             {/* User role pill on mobile */}
             <span
               className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md lg:hidden ${

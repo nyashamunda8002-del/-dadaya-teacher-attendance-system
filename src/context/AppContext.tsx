@@ -41,6 +41,7 @@ interface AppContextType {
   allocateClassesToTeacher: (teacherId: string, classNames: string[]) => Promise<{ success: boolean; message: string }>;
   saveSchoolClass: (cls: SchoolClass) => Promise<{ success: boolean; message: string }>;
   deleteSchoolClass: (id: string) => Promise<void>;
+  resetToOfficialClasses: () => Promise<{ success: boolean; message: string }>;
   notifications: EarlyClockNotification[];
   leaveRequests: LeaveRequest[];
   schoolSettings: SchoolSettings;
@@ -172,28 +173,44 @@ const DEFAULT_ADMIN_USER: User = {
 };
 
 export const DEFAULT_CLASSES: SchoolClass[] = [
-  { id: 'cls-1a', name: 'Form 1A', formLevel: 'Form 1', capacity: 45, roomNumber: 'Block A, Rm 1' },
-  { id: 'cls-1b', name: 'Form 1B', formLevel: 'Form 1', capacity: 45, roomNumber: 'Block A, Rm 2' },
-  { id: 'cls-1c', name: 'Form 1C', formLevel: 'Form 1', capacity: 44, roomNumber: 'Block A, Rm 3' },
-  { id: 'cls-2a', name: 'Form 2A', formLevel: 'Form 2', capacity: 45, roomNumber: 'Block B, Rm 1' },
-  { id: 'cls-2b', name: 'Form 2B', formLevel: 'Form 2', capacity: 44, roomNumber: 'Block B, Rm 2' },
-  { id: 'cls-2c', name: 'Form 2C', formLevel: 'Form 2', capacity: 44, roomNumber: 'Block B, Rm 3' },
-  { id: 'cls-3sc', name: 'Form 3 Science', formLevel: 'Form 3', capacity: 42, roomNumber: 'Science Wing Rm 1' },
-  { id: 'cls-3art', name: 'Form 3 Arts', formLevel: 'Form 3', capacity: 45, roomNumber: 'Block C, Rm 1' },
-  { id: 'cls-3comm', name: 'Form 3 Commercials', formLevel: 'Form 3', capacity: 43, roomNumber: 'Block C, Rm 2' },
-  { id: 'cls-4sc', name: 'Form 4 Science', formLevel: 'Form 4', capacity: 40, roomNumber: 'Science Wing Rm 2' },
-  { id: 'cls-4art', name: 'Form 4 Arts', formLevel: 'Form 4', capacity: 44, roomNumber: 'Block C, Rm 3' },
-  { id: 'cls-4comm', name: 'Form 4 Commercials', formLevel: 'Form 4', capacity: 44, roomNumber: 'Block C, Rm 4' },
+  // Form 1 - Official Dadaya Stream (Red, Green, Yellow, Blue)
+  { id: 'cls-1red', name: 'Form 1 Red', formLevel: 'Form 1', capacity: 45, roomNumber: 'Form 1 Block, Rm 1' },
+  { id: 'cls-1green', name: 'Form 1 Green', formLevel: 'Form 1', capacity: 45, roomNumber: 'Form 1 Block, Rm 2' },
+  { id: 'cls-1yellow', name: 'Form 1 Yellow', formLevel: 'Form 1', capacity: 45, roomNumber: 'Form 1 Block, Rm 3' },
+  { id: 'cls-1blue', name: 'Form 1 Blue', formLevel: 'Form 1', capacity: 45, roomNumber: 'Form 1 Block, Rm 4' },
+
+  // Form 2 - Official Dadaya Stream (Red, Green, White, Yellow, Blue)
+  { id: 'cls-2red', name: 'Form 2 Red', formLevel: 'Form 2', capacity: 45, roomNumber: 'Form 2 Block, Rm 1' },
+  { id: 'cls-2green', name: 'Form 2 Green', formLevel: 'Form 2', capacity: 45, roomNumber: 'Form 2 Block, Rm 2' },
+  { id: 'cls-2white', name: 'Form 2 White', formLevel: 'Form 2', capacity: 45, roomNumber: 'Form 2 Block, Rm 3' },
+  { id: 'cls-2yellow', name: 'Form 2 Yellow', formLevel: 'Form 2', capacity: 45, roomNumber: 'Form 2 Block, Rm 4' },
+  { id: 'cls-2blue', name: 'Form 2 Blue', formLevel: 'Form 2', capacity: 45, roomNumber: 'Form 2 Block, Rm 5' },
+
+  // Form 3 - Official Dadaya Stream (Sciences 1, Sciences 2, Commercials, Arts/ICT)
+  { id: 'cls-3sc1', name: 'Form 3 Sciences 1', formLevel: 'Form 3', capacity: 42, roomNumber: 'Science Wing Rm 1' },
+  { id: 'cls-3sc2', name: 'Form 3 Sciences 2', formLevel: 'Form 3', capacity: 42, roomNumber: 'Science Wing Rm 2' },
+  { id: 'cls-3comm', name: 'Form 3 Commercials', formLevel: 'Form 3', capacity: 45, roomNumber: 'Commercials Block Rm 1' },
+  { id: 'cls-3arts-ict', name: 'Form 3 Arts/ICT', formLevel: 'Form 3', capacity: 45, roomNumber: 'Arts/ICT Wing Rm 1' },
+
+  // Form 4 - Official Dadaya Stream (Sciences 1, Sciences 2, Commercials, Arts/ICT)
+  { id: 'cls-4sc1', name: 'Form 4 Sciences 1', formLevel: 'Form 4', capacity: 40, roomNumber: 'Science Wing Rm 3' },
+  { id: 'cls-4sc2', name: 'Form 4 Sciences 2', formLevel: 'Form 4', capacity: 40, roomNumber: 'Science Wing Rm 4' },
+  { id: 'cls-4comm', name: 'Form 4 Commercials', formLevel: 'Form 4', capacity: 45, roomNumber: 'Commercials Block Rm 2' },
+  { id: 'cls-4arts-ict', name: 'Form 4 Arts/ICT', formLevel: 'Form 4', capacity: 45, roomNumber: 'Arts/ICT Wing Rm 2' },
+
+  // A Level (Lower 6 & Upper 6)
   { id: 'cls-l6sc', name: 'Lower 6 Sciences', formLevel: 'Lower 6', capacity: 35, roomNumber: 'Sixth Form Block Rm 1' },
-  { id: 'cls-l6art', name: 'Lower 6 Arts', formLevel: 'Lower 6', capacity: 38, roomNumber: 'Sixth Form Block Rm 2' },
-  { id: 'cls-u6sc', name: 'Upper 6 Sciences', formLevel: 'Upper 6', capacity: 32, roomNumber: 'Sixth Form Block Rm 3' },
-  { id: 'cls-u6art', name: 'Upper 6 Arts', formLevel: 'Upper 6', capacity: 36, roomNumber: 'Sixth Form Block Rm 4' },
+  { id: 'cls-l6comm', name: 'Lower 6 Commercials', formLevel: 'Lower 6', capacity: 35, roomNumber: 'Sixth Form Block Rm 2' },
+  { id: 'cls-l6art', name: 'Lower 6 Arts', formLevel: 'Lower 6', capacity: 38, roomNumber: 'Sixth Form Block Rm 3' },
+  { id: 'cls-u6sc', name: 'Upper 6 Sciences', formLevel: 'Upper 6', capacity: 32, roomNumber: 'Sixth Form Block Rm 4' },
+  { id: 'cls-u6comm', name: 'Upper 6 Commercials', formLevel: 'Upper 6', capacity: 35, roomNumber: 'Sixth Form Block Rm 5' },
+  { id: 'cls-u6art', name: 'Upper 6 Arts', formLevel: 'Upper 6', capacity: 36, roomNumber: 'Sixth Form Block Rm 6' },
 ];
 
 export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
   {
-    id: 'att-demo-1a',
-    className: 'Form 1A',
+    id: 'att-demo-1red',
+    className: 'Form 1 Red',
     teacherId: 'tch-001',
     teacherName: 'Tendai Moyo',
     date: new Date().toISOString().split('T')[0],
@@ -208,8 +225,8 @@ export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
     createdAt: new Date().toISOString(),
   },
   {
-    id: 'att-demo-1b',
-    className: 'Form 1B',
+    id: 'att-demo-2green',
+    className: 'Form 2 Green',
     teacherId: 'tch-002',
     teacherName: 'Chipo Dube',
     date: new Date().toISOString().split('T')[0],
@@ -224,8 +241,8 @@ export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
     createdAt: new Date().toISOString(),
   },
   {
-    id: 'att-demo-3sc',
-    className: 'Form 3 Science',
+    id: 'att-demo-3sc1',
+    className: 'Form 3 Sciences 1',
     teacherId: 'tch-003',
     teacherName: 'Blessing Sibanda',
     date: new Date().toISOString().split('T')[0],
@@ -240,8 +257,8 @@ export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
     createdAt: new Date().toISOString(),
   },
   {
-    id: 'att-demo-4sc',
-    className: 'Form 4 Science',
+    id: 'att-demo-4sc1',
+    className: 'Form 4 Sciences 1',
     teacherId: 'tch-004',
     teacherName: 'Farai Ncube',
     date: new Date().toISOString().split('T')[0],
@@ -268,7 +285,7 @@ export const DEFAULT_STUDENT_ATTENDANCE: StudentAttendanceRecord[] = [
     boysDay: 7,
     actualTotal: 32,
     possibleTotal: 32,
-    notes: 'Full attendance',
+    notes: 'Full chemistry lab attendance',
     createdAt: new Date().toISOString(),
   },
 ];
@@ -438,7 +455,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // If stored classes are from the old template (containing Form 1A, Form 2A, Form 3 Science, etc.), auto-upgrade to Dadaya High School official classes
+          const hasOldTemplate = parsed.some(
+            (c: any) => c.name === 'Form 1A' || c.name === 'Form 2A' || c.name === 'Form 3 Science' || c.id === 'cls-1a'
+          );
+          if (!hasOldTemplate) {
+            // Remove Form 1 White
+            const filtered = parsed.filter(
+              (c: any) => c.name !== 'Form 1 White' && c.id !== 'cls-1white'
+            );
+            // Ensure Form 1 Yellow is included
+            const hasYellow = filtered.some(
+              (c: any) => c.name === 'Form 1 Yellow' || c.id === 'cls-1yellow'
+            );
+            if (!hasYellow) {
+              const yellowCls: SchoolClass = {
+                id: 'cls-1yellow',
+                name: 'Form 1 Yellow',
+                formLevel: 'Form 1',
+                capacity: 45,
+                roomNumber: 'Form 1 Block, Rm 3',
+              };
+              const greenIdx = filtered.findIndex((c: any) => c.id === 'cls-1green' || c.name === 'Form 1 Green');
+              if (greenIdx >= 0) {
+                filtered.splice(greenIdx + 1, 0, yellowCls);
+              } else {
+                filtered.unshift(yellowCls);
+              }
+            }
+            return filtered;
+          }
+        }
       } catch {}
     }
     return DEFAULT_CLASSES;
@@ -446,7 +494,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Currently selected/registered class for teacher
   const [selectedTeacherClass, setSelectedTeacherClassState] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEYS.TEACHER_SELECTED_CLASS) || '';
+    const saved = localStorage.getItem(STORAGE_KEYS.TEACHER_SELECTED_CLASS) || '';
+    return saved === 'Form 1 White' ? '' : saved;
   });
 
   const setSelectedTeacherClass = (className: string) => {
@@ -692,7 +741,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: docSnap.id,
               ...docSnap.data(),
             } as SchoolClass));
-            setClasses(firestoreClasses);
+
+            // Ensure Form 1 White is cleaned from Firestore and Form 1 Yellow is present
+            if (firestoreClasses.some((c: any) => c.id === 'cls-1white' || c.name === 'Form 1 White')) {
+              deleteDoc(doc(db, 'classes', 'cls-1white')).catch(() => null);
+            }
+
+            const yellowInFirestore = firestoreClasses.some(
+              (c: any) => c.id === 'cls-1yellow' || c.name === 'Form 1 Yellow'
+            );
+            if (!yellowInFirestore) {
+              const yellowCls = DEFAULT_CLASSES.find((c) => c.id === 'cls-1yellow');
+              if (yellowCls) {
+                setDoc(doc(db, 'classes', 'cls-1yellow'), yellowCls).catch(() => null);
+              }
+            }
+
+            const cleanClasses = firestoreClasses
+              .filter((c: any) => c.id !== 'cls-1white' && c.name !== 'Form 1 White');
+
+            if (!yellowInFirestore) {
+              const yellowCls = DEFAULT_CLASSES.find((c) => c.id === 'cls-1yellow');
+              if (yellowCls && !cleanClasses.some((c) => c.id === 'cls-1yellow')) {
+                cleanClasses.push(yellowCls);
+              }
+            }
+
+            const hasOldTemplate = cleanClasses.some(
+              (c: any) => c.name === 'Form 1A' || c.id === 'cls-1a' || c.name === 'Form 2A' || c.name === 'Form 3 Science'
+            );
+
+            if (!hasOldTemplate) {
+              setClasses(cleanClasses);
+            } else {
+              // Remote still has obsolete template classes; replace them with official Dadaya classes
+              DEFAULT_CLASSES.forEach((cls) => {
+                setDoc(doc(db, 'classes', cls.id), cls).catch(() => null);
+              });
+              setClasses(DEFAULT_CLASSES);
+            }
+          } else {
+            // Seed official classes to Firestore on first load
+            DEFAULT_CLASSES.forEach((cls) => {
+              setDoc(doc(db, 'classes', cls.id), cls).catch(() => null);
+            });
           }
         },
         (error) => {
@@ -1024,26 +1116,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const trimmedEmail = email.trim().toLowerCase();
     const cleanPassword = password ? password.trim() : '';
 
-    // 1. Check direct Firestore user document if available
-    try {
-      if (trimmedEmail === DADAYA_ADMIN_CREDENTIALS.email.toLowerCase()) {
-        const adminDoc = await getDoc(doc(db, 'users', DEFAULT_ADMIN_USER.id));
-        if (adminDoc.exists()) {
-          const remoteAdmin = adminDoc.data() as User;
-          if (remoteAdmin.password === cleanPassword || (!remoteAdmin.password && cleanPassword === DADAYA_ADMIN_CREDENTIALS.password)) {
-            setCurrentUser(remoteAdmin);
-            setActiveView('dashboard');
-            return { success: true, user: remoteAdmin };
-          } else {
-            return {
-              success: false,
-              error: 'Incorrect administrator password. Please verify the password and try again.',
-            };
+    // 1. Check direct Firestore user document if available and online
+    if (navigator.onLine) {
+      try {
+        if (trimmedEmail === DADAYA_ADMIN_CREDENTIALS.email.toLowerCase()) {
+          const fetchAdminPromise = getDoc(doc(db, 'users', DEFAULT_ADMIN_USER.id));
+          const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Network timeout')), 1500));
+          const adminDoc = await Promise.race([fetchAdminPromise, timeoutPromise]);
+          if (adminDoc.exists()) {
+            const remoteAdmin = adminDoc.data() as User;
+            if (remoteAdmin.password === cleanPassword || (!remoteAdmin.password && cleanPassword === DADAYA_ADMIN_CREDENTIALS.password)) {
+              setCurrentUser(remoteAdmin);
+              setActiveView('dashboard');
+              return { success: true, user: remoteAdmin };
+            } else {
+              return {
+                success: false,
+                error: 'Incorrect administrator password. Please verify the password and try again.',
+              };
+            }
           }
         }
+      } catch (fsErr) {
+        console.warn('Direct Firestore user verification note:', fsErr);
       }
-    } catch (fsErr) {
-      console.warn('Direct Firestore user verification note:', fsErr);
     }
 
     // 2. Official Dadaya High School Admin Account Validation
@@ -2353,6 +2449,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const resetToOfficialClasses = async (): Promise<{ success: boolean; message: string }> => {
+    setClasses(DEFAULT_CLASSES);
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(DEFAULT_CLASSES));
+    try {
+      await deleteDoc(doc(db, 'classes', 'cls-1white')).catch(() => null);
+      // Clear or overwrite all in Firestore
+      for (const cls of DEFAULT_CLASSES) {
+        await setDoc(doc(db, 'classes', cls.id), cls);
+      }
+    } catch (err) {
+      console.warn('Firestore reset official classes error:', err);
+    }
+    soundEffects.playClockInSuccess();
+    return {
+      success: true,
+      message: 'Dadaya High School classes successfully reset to official structure!',
+    };
+  };
+
   const updateSchoolSettings = (newSettings: Partial<SchoolSettings>) => {
     const merged = { ...schoolSettings, ...newSettings };
     setSchoolSettings(merged);
@@ -2634,6 +2749,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         allocateClassesToTeacher,
         saveSchoolClass,
         deleteSchoolClass,
+        resetToOfficialClasses,
         notifications,
         leaveRequests,
         schoolSettings,

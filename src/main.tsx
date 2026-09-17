@@ -5,16 +5,23 @@ import './index.css';
 
 // Register Service Worker for offline app opening support (offline clocking is prohibited)
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  const registerSW = () => {
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/sw.js', { scope: '/' })
       .then((reg) => {
-        console.log('Dadaya High School SW registered:', reg.scope);
+        // Trigger check for updates
+        reg.update().catch(() => {});
       })
       .catch((err) => {
         console.warn('SW registration failed:', err);
       });
-  });
+  };
+
+  if (document.readyState === 'complete') {
+    registerSW();
+  } else {
+    window.addEventListener('load', registerSW);
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

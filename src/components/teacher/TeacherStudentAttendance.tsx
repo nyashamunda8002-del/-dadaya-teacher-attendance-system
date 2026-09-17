@@ -251,7 +251,7 @@ export const TeacherStudentAttendance: React.FC = () => {
                 {currentClass ? 'Switch or Change Class' : 'Register Class to Manage'}
               </h3>
               <p className="text-xs text-slate-500">
-                Enter your class name (e.g., Form 1A, Form 3 Science, Lower 6 Arts) or choose from school classes.
+                Enter your class name (e.g., Form 1 Red, Form 3 Sciences 1, Form 4 Commercials) or choose from official Dadaya classes.
               </p>
             </div>
           </div>
@@ -260,7 +260,7 @@ export const TeacherStudentAttendance: React.FC = () => {
             <div className="relative flex-1">
               <input
                 type="text"
-                placeholder="Enter class name (e.g. Form 3 Science, Form 1B)..."
+                placeholder="Enter class name (e.g. Form 1 Red, Form 2 Green, Form 3 Sciences 1)..."
                 value={inputClassName}
                 onChange={(e) => setInputClassName(e.target.value)}
                 onKeyDown={(e) => {
@@ -291,17 +291,21 @@ export const TeacherStudentAttendance: React.FC = () => {
           {/* Quick suggestions from school classes */}
           <div className="mt-4 pt-3 border-t border-slate-100">
             <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">
-              Popular Dadaya High School Classes:
+              Official Dadaya High School Classes:
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {classes.slice(0, 10).map((c) => (
+            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+              {classes.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => {
                     setInputClassName(c.name);
                     handleRegisterOrChangeClass(c.name);
                   }}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currentClass.toLowerCase() === c.name.toLowerCase()
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700'
+                  }`}
                 >
                   {c.name}
                 </button>

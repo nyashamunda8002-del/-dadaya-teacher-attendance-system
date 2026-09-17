@@ -13,6 +13,8 @@
     <meta name="application-name" content="Dadaya High Staff Clocking System" />
     <meta name="msapplication-TileColor" content="#064e3b" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <link rel="manifest" href="/manifest.json" />
     <!-- Free interactive maps: Leaflet + OpenStreetMap (no Google Maps API key required) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <meta property="og:title" content="Dadaya High Staff Clocking System" />
@@ -22,16 +24,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script>
-      // Clean up any previously registered service workers to prevent PWA install prompts
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (let registration of registrations) {
-            registration.unregister();
-          }
-        });
-      }
-    </script>
   </head>
   <body class="bg-slate-100 font-sans antialiased text-slate-900">
     <div id="root"></div>

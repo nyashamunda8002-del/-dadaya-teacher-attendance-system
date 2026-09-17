@@ -24,9 +24,21 @@ interface LocationGateProps {
 
 export const LocationGate: React.FC<LocationGateProps> = ({ children, onLocationVerified }) => {
   const { isDemoMode, setSimulationMode, demoCoords } = useApp();
-  const [locationStatus, setLocationStatus] = useState<'checking' | 'prompt' | 'granted' | 'denied' | 'error'>('checking');
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem('dadaya_last_known_coords');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
+  const [locationStatus, setLocationStatus] = useState<'checking' | 'prompt' | 'granted' | 'denied' | 'error'>(() => {
+    try {
+      const saved = localStorage.getItem('dadaya_last_known_coords');
+      if (saved) return 'granted';
+    } catch {}
+    return 'checking';
+  });
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
 
@@ -51,6 +63,9 @@ export const LocationGate: React.FC<LocationGateProps> = ({ children, onLocation
           accuracy: position.coords.accuracy,
         };
         setCoords(newCoords);
+        try {
+          localStorage.setItem('dadaya_last_known_coords', JSON.stringify(newCoords));
+        } catch {}
         setLocationStatus('granted');
         setIsRequesting(false);
         setErrorMessage('');
@@ -66,20 +81,30 @@ export const LocationGate: React.FC<LocationGateProps> = ({ children, onLocation
           setLocationStatus('denied');
           setErrorMessage('Location permission was denied. The Dadaya High School portal requires active device GPS to function.');
         } else if (error.code === error.POSITION_UNAVAILABLE) {
-          setLocationStatus('error');
-          setErrorMessage('GPS position unavailable. Please ensure device Location / GPS services are toggled on.');
+          // If we have cached coords from before, maintain granted state so app can open offline
+          const hasCached = !!localStorage.getItem('dadaya_last_known_coords');
+          if (!hasCached) {
+            setLocationStatus('error');
+            setErrorMessage('GPS position unavailable. Please ensure device Location / GPS services are toggled on.');
+          }
         } else if (error.code === error.TIMEOUT) {
-          setLocationStatus('error');
-          setErrorMessage('GPS location request timed out. Please tap retry.');
+          const hasCached = !!localStorage.getItem('dadaya_last_known_coords');
+          if (!hasCached) {
+            setLocationStatus('error');
+            setErrorMessage('GPS location request timed out. Please tap retry.');
+          }
         } else {
-          setLocationStatus('error');
-          setErrorMessage(error.message || 'Unable to retrieve location coordinates.');
+          const hasCached = !!localStorage.getItem('dadaya_last_known_coords');
+          if (!hasCached) {
+            setLocationStatus('error');
+            setErrorMessage(error.message || 'Unable to retrieve location coordinates.');
+          }
         }
       },
       {
         enableHighAccuracy: true,
         timeout: 12000,
-        maximumAge: 10000,
+        maximumAge: 60000,
       }
     );
   }, [onLocationVerified]);

@@ -1,8 +1,8 @@
 {
   "name": "Dadaya High Staff Clocking System",
-  "short_name": "Dadaya Staff Clocking",
-  "description": "Dadaya High School Official Staff Clocking System Android App",
-  "id": "org.dadayahighschool.attendance",
+  "short_name": "Dadaya Staff",
+  "description": "Dadaya High School Official Staff Clocking System",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -16,10 +16,22 @@
   "prefer_related_applications": false,
   "icons": [
     {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icon.png",
       "sizes": "192x192 512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     },
     {
       "src": "/dadaya-crest.jpg",
@@ -31,7 +43,7 @@
       "src": "/icon.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -40,21 +52,21 @@
       "short_name": "Clock In",
       "description": "Quickly clock in or out for duty",
       "url": "/?view=home",
-      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "Attendance History",
       "short_name": "History",
       "description": "View past attendance records",
       "url": "/?view=history",
-      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "Leave Application",
       "short_name": "Leave",
       "description": "Submit a leave request",
       "url": "/?view=leave",
-      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     }
   ]
 }

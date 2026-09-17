@@ -15,7 +15,7 @@ export interface User {
   department?: string;
   avatarUrl?: string;
   theme?: ThemeMode;
-  assignedClasses?: string[]; // Classes allocated to teacher e.g. ["Form 1A", "Form 3 Science"]
+  assignedClasses?: string[]; // Classes allocated to teacher e.g. ["Form 1 Red", "Form 3 Sciences 1", "Form 4 Commercials"]
   createdAt: string;
 }
 
